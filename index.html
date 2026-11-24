@@ -40,6 +40,135 @@ body[data-theme="Golden"]{--bg:#faf6eb;--panel:#fffefa;--ink:#483b27;--muted:#79
 body[data-theme="Slate"]{--bg:#f1f3f5;--panel:#ffffff;--ink:#303a45;--muted:#65717e;--accent:#506579;--line:#dbe1e7;--soft:#e4e9ee;--rail:#2c3642;--railText:#edf2f6;--trim:#aebdc9;}
 aside{border-bottom-color:var(--trim,#a9c58b)}.hero-date strong,.hero .eyebrow,.values h3{color:var(--railText)}.theme-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:14px}.theme-gallery .theme-option{display:flex;flex-direction:column;gap:10px;text-align:left;align-items:stretch;padding:12px;background:var(--panel);border:2px solid var(--line);border-radius:12px;min-width:0;white-space:normal}.theme-gallery .theme-option[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 2px var(--soft)}.theme-preview{display:block;border:1px solid #0001;border-radius:8px;overflow:hidden;background:var(--pbg);height:82px}.theme-preview-head{display:block;height:17px;background:var(--pr);border-bottom:3px solid var(--pt)}.theme-preview-content{display:grid;grid-template-columns:2fr 1fr;gap:5px;padding:8px}.theme-preview-content span{display:block;height:17px;border-radius:3px;background:var(--pp)}.theme-preview-content span:first-child{background:var(--pa)}.theme-preview-content span:last-child{background:var(--ps)}.theme-option small{font-weight:400}.theme-option .theme-selected{font-size:11px;color:var(--accent)}
 .brandcopy{min-width:0;max-width:220px}.brandcopy #hubBrandName{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hub-seating{--seat-ink:#173653;--seat-line:#cbd9e6;--seat-bg:#fff;display:grid;gap:16px}
+.hub-seat-top{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.hub-seat-toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.hub-seat-toolbar button,.hub-seat-side button{min-height:42px}
+.hub-seat-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,310px);gap:18px;align-items:start}
+.hub-seat-board,.hub-seat-side{background:#fff;border:1px solid var(--seat-line);border-radius:16px;padding:16px;min-width:0;color:var(--seat-ink)}
+.hub-seat-heading{font-weight:800;background:#e0edfc;color:#193e63;border:2px dashed #8bb3d8;border-radius:9px;padding:10px;text-align:center;margin-bottom:15px}
+.hub-seat-row-stack{display:flex;flex-direction:column;gap:16px}
+.hub-seat-desk-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;min-height:105px}
+.hub-seat-floor{grid-column:2 / 4;display:grid;place-items:center;min-height:90px;border:2px dashed #b3d3ed;border-radius:12px;background:#f0f7ff;text-align:center;color:#507190;font-weight:750;font-size:13px;padding:8px}
+.hub-seat-teacher{display:grid;place-items:center;text-align:center;background:#eee0c7;color:#604629;border:2px solid #dec8a2;border-radius:12px;font-weight:800;padding:8px;font-size:13px}
+.hub-seat-joined{grid-column:span 2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+.hub-seat-joined .hub-seat-desk:first-child{border-radius:12px 0 0 12px;border-right-width:1px}
+.hub-seat-joined .hub-seat-desk:last-child{border-radius:0 12px 12px 0;border-left-width:1px}
+.hub-seat-desk{background:#e7edf3;border:2px solid #b0bdca;border-radius:12px;padding:8px;min-width:0}
+.hub-seat-desk-label{font-size:11px;color:#4d6377;letter-spacing:.03em;font-weight:800;margin:0 0 7px}
+.hub-seat-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.hub-seat-person{min-height:49px;min-width:0;padding:6px 2px;display:grid;place-items:center;text-align:center;background:#fff;color:#172638;border:2px solid #bed0e0;border-radius:8px;overflow-wrap:anywhere;font-size:clamp(11px,1vw,14px);line-height:1.2;font-weight:750;cursor:pointer;touch-action:manipulation}
+.hub-seat-person:hover{border-color:#1b70b1;background:#f0f7fd}
+.hub-seat-person:focus-visible,.hub-seat-unseated:focus-visible{outline:3px solid #edaa3c;outline-offset:2px}
+.hub-seat-person.is-empty{color:#7d91a4;font-weight:500}
+.hub-seat-person.is-selected{background:#fff1ca;border-color:#e39200;box-shadow:0 0 0 2px rgba(227,146,0,.15)}
+.hub-seat-person.is-target{border-color:#28855b}
+.hub-seat-side h3{font-size:17px;color:#193e63;margin:3px 0 7px}
+.hub-seat-side p,.hub-seat-help{font-size:13px;color:#52687e;line-height:1.55}
+.hub-seat-side textarea{width:100%;min-height:200px;padding:10px;border:1px solid #aebed0;border-radius:9px;font:14px system-ui,Arial;resize:vertical;background:#fff;color:#172638}
+.hub-seat-unseated-list{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow:auto}
+.hub-seat-unseated{border:1px solid #c5d7e6;border-radius:30px;background:#f3f8fd;color:#1f496c;padding:8px 10px;font-size:12px;font-weight:750;cursor:pointer;touch-action:manipulation}
+.hub-seat-unseated.is-selected{background:#fff1ca;border-color:#e39200;color:#573800}
+.hub-seat-count{font-size:13px;font-weight:800;color:#255e45}
+.hub-seat-smallactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.hub-seat-print-head{display:none}
+@media(max-width:1050px){.hub-seat-columns{grid-template-columns:1fr}.hub-seat-side{max-width:none}.hub-seat-side textarea{min-height:125px}}
+@media(max-width:650px){.hub-seat-board{padding:7px}.hub-seat-row-stack{gap:9px}.hub-seat-desk-row{gap:4px;min-height:84px}.hub-seat-desk{padding:4px}.hub-seat-desk-label{font-size:9px}.hub-seat-pair{gap:2px}.hub-seat-person{font-size:10px;min-height:38px;padding:3px 1px}.hub-seat-floor,.hub-seat-teacher{font-size:11px}}
+@media print{
+ body:has(#hub-seat-board) .sidebar,body:has(#hub-seat-board) .topbar,body:has(#hub-seat-board) .floating-dock,body:has(#hub-seat-board) .hub-seat-toolbar,body:has(#hub-seat-board) .hub-seat-side,body:has(#hub-seat-board) .hub-seat-help,body:has(#hub-seat-board) .hub-seat-top{display:none!important}
+ body:has(#hub-seat-board) .app{display:block!important}
+ body:has(#hub-seat-board) .main,body:has(#hub-seat-board) .maincontent,body:has(#hub-seat-board) .hub-seat-columns{display:block!important;width:100%!important;padding:0!important;margin:0!important}
+ body:has(#hub-seat-board) .hub-seat-board{border:0!important;padding:0!important}
+ body:has(#hub-seat-board) .hub-seat-print-head{display:block;margin-bottom:20px;color:#172638}
+ body:has(#hub-seat-board) .hub-seat-person{font-size:12px!important}
+ body:has(#hub-seat-board) .hub-seat-desk,body:has(#hub-seat-board) .hub-seat-person{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+.hub-seat-pairing{margin:18px 0;padding:13px;border:1px solid #cfdeeb;background:#f4f8fc;border-radius:13px}
+.hub-seat-pairing h3{margin:0 0 7px;color:#193e63}
+.hub-seat-pair-toggle{display:flex!important;align-items:center;gap:9px;cursor:pointer;font-weight:750!important;color:#183e60!important;font-size:13px!important;line-height:1.4}
+.hub-seat-pair-toggle input{width:19px!important;height:19px!important;flex:none;margin:0}
+.hub-seat-pair-list{max-height:250px;overflow-y:auto;display:grid;gap:5px;border-radius:10px;margin-top:10px}
+.hub-seat-pair-row{display:grid;grid-template-columns:minmax(0,1fr) 114px;gap:8px;align-items:center;background:#fff;border:1px solid #dce6ee;border-radius:9px;padding:6px 8px;min-height:39px}
+.hub-seat-pair-row .student{font-size:13px;font-weight:720;color:#24435f;overflow-wrap:anywhere}
+.hub-seat-pair-row select{min-width:0;width:100%;padding:5px 7px;font-size:12px;color:#153b59;background:#fff;border:1px solid #b9cede;border-radius:7px}
+.hub-seat-pair-note{font-size:12px!important;color:#536c81!important;line-height:1.5;margin:9px 0 5px!important}
+.hub-seat-pair-stats{font-size:12px;font-weight:750;color:#205c77;margin-top:9px}
+.hub-seat-pair-enabled{border-color:#65a18a;background:#f2faf6}
+@media print{body:has(#hub-seat-board) .hub-seat-pairing{display:none!important}}
+.hub-seat-layout-choice{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:#edf4fb;border:1px solid #d3e3ef;border-radius:13px;padding:12px 14px;color:#173653}
+.hub-seat-layout-choice label{margin:0;font-size:13px;white-space:nowrap;color:#173653}
+.hub-seat-layout-choice select{width:auto;flex:1 1 230px;max-width:390px;padding:9px 12px;font-size:14px;font-weight:750}
+.hub-seat-layout-note{font-size:12px;color:#55718a;flex-basis:100%}
+.hub-seat-row-caption{font-size:12px;letter-spacing:.08em;font-weight:850;color:#43688c;padding:5px 1px 2px;margin-top:1px}
+.hub-seat-desk-row.hub-seat-tall-row{min-height:172px;gap:10px}
+.hub-seat-tall-row.has-aisle{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(44px,.32fr) minmax(0,1fr) minmax(0,1fr)}
+.hub-seat-tall-row .hub-seat-desk{min-height:170px;display:flex;flex-direction:column;background:#e6edf4}
+.hub-seat-tall-row .hub-seat-pair{display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px;flex:1}
+.hub-seat-tall-row .hub-seat-person{min-height:54px;padding:8px 4px;font-size:clamp(11px,1vw,15px)}
+.hub-seat-aisle{display:grid;place-items:center;writing-mode:vertical-rl;letter-spacing:.14em;font-size:10px;font-weight:800;color:#718da4;background:#f0f6fb;border:2px dashed #c5d9ea;border-radius:10px}
+@media(max-width:700px){.hub-seat-tall-row.has-aisle{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 23px minmax(0,1fr) minmax(0,1fr)}.hub-seat-desk-row.hub-seat-tall-row{gap:4px;min-height:145px}.hub-seat-tall-row .hub-seat-desk{padding:4px;min-height:145px}.hub-seat-tall-row .hub-seat-pair{gap:4px}.hub-seat-tall-row .hub-seat-person{font-size:10px;padding:4px 2px;min-height:44px}.hub-seat-aisle{font-size:8px}.hub-seat-layout-choice{padding:9px}}
+@media print{body:has(#hub-seat-board) .hub-seat-layout-choice{display:none!important}body:has(#hub-seat-board) .hub-seat-tall-row .hub-seat-desk{min-height:140px!important}body:has(#hub-seat-board) .hub-seat-tall-row .hub-seat-person{min-height:42px!important}}
+.hub-seat-custom-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#edf6ff;border:1px solid #c7dfef;border-radius:12px;padding:12px;margin:12px 0;color:#173653}
+.hub-seat-custom-tools .btn{min-height:38px}.hub-seat-custom-tools .hub-seat-snap{display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;font-size:13px;color:#173653}
+.hub-seat-custom-tools .hub-seat-snap input{width:17px;height:17px;margin:0}
+.hub-seat-free-board{position:relative;width:100%;height:690px;min-height:560px;border:2px solid #aec8dd;border-radius:15px;overflow:hidden;background-color:#f5f9fd;background-image:linear-gradient(#dae8f4 1px,transparent 1px),linear-gradient(90deg,#dae8f4 1px,transparent 1px);background-size:5% 5%;touch-action:pan-y;user-select:none}
+.hub-seat-free-front{position:absolute;z-index:1;top:0;left:0;right:0;text-align:center;background:#d7e8f8;border-bottom:2px dashed #7ca6c6;color:#1b4d72;font-size:12px;font-weight:850;letter-spacing:.06em;padding:7px;pointer-events:none}
+.hub-seat-free-desk{position:absolute;z-index:2;width:20.5%;box-sizing:border-box;min-height:104px;padding:6px;border:2px solid #a6bbc9;border-radius:11px;background:#e5ecf3;box-shadow:0 3px 9px #17365317;color:#173653;touch-action:pan-y}
+.hub-seat-free-desk.dragging{z-index:20;box-shadow:0 10px 24px #14374d53;border-color:#227fba;background:#deeffc}
+.hub-seat-free-head{display:flex;align-items:center;justify-content:space-between;gap:3px;margin-bottom:7px}
+.hub-seat-free-grip{border:0;color:#184a75;background:#c5dff3;border-radius:7px;min-height:35px;min-width:0;flex:1;cursor:grab;touch-action:none;font-weight:850;font-size:clamp(10px,1.1vw,13px);padding:5px;white-space:nowrap}
+.hub-seat-free-grip:active{cursor:grabbing;background:#a4cee9}
+.hub-seat-free-grip:focus-visible,.hub-seat-free-rotate:focus-visible{outline:3px solid #e0a039;outline-offset:2px}
+.hub-seat-free-rotate{border:1px solid #adc4d8;border-radius:7px;color:#184a75;background:#fff;min-height:35px;min-width:35px;padding:4px;cursor:pointer;font-size:17px;touch-action:manipulation}
+.hub-seat-free-desk .hub-seat-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.hub-seat-free-desk.vertical .hub-seat-pair{grid-template-columns:1fr}
+.hub-seat-free-desk .hub-seat-person{font-size:clamp(9px,.82vw,12px);padding:4px 1px;min-height:35px}
+.hub-seat-free-desk.vertical .hub-seat-person{min-height:26px}
+.hub-seat-free-tip{font-size:12px;color:#4f6d82;margin:7px 0}
+@media(max-width:760px){.hub-seat-free-board{height:610px}.hub-seat-free-head{gap:2px}.hub-seat-free-grip{font-size:10px;min-height:31px;padding:3px}.hub-seat-free-rotate{min-height:31px;min-width:25px;padding:2px}.hub-seat-free-desk{width:21%;padding:3px}.hub-seat-free-desk .hub-seat-person{font-size:9px}}
+@media print{
+ body:has(#hub-seat-board) .hub-seat-custom-tools,body:has(#hub-seat-board) .hub-seat-free-tip,body:has(#hub-seat-board) .hub-seat-free-rotate{display:none!important}
+ body:has(#hub-seat-board) .hub-seat-free-board{height:690px!important;min-height:690px!important;background:#fff!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ body:has(#hub-seat-board) .hub-seat-free-grip{background:transparent!important;color:#173653!important;min-height:23px!important;cursor:default!important}
+ body:has(#hub-seat-board) .hub-seat-free-desk{break-inside:avoid}
+}
+.hub-seat-free-board[data-desk-size="compact"]{--seat-wide:14%;--seat-narrow:9%;--seat-short:80px;--seat-long:126px;--seat-font:10px;--seat-gap:3px}
+.hub-seat-free-board[data-desk-size="tiny"]{--seat-wide:11.5%;--seat-narrow:7.9%;--seat-short:70px;--seat-long:107px;--seat-font:9px;--seat-gap:2px}
+.hub-seat-free-board[data-desk-size="regular"]{--seat-wide:17%;--seat-narrow:11%;--seat-short:95px;--seat-long:147px;--seat-font:11px;--seat-gap:4px}
+.hub-seat-free-board .hub-seat-free-desk{width:var(--seat-wide);height:var(--seat-short);min-height:0;padding:4px;display:flex;flex-direction:column;gap:3px;transition:box-shadow .12s,border-color .12s}
+.hub-seat-free-board .hub-seat-free-desk.orient-90,.hub-seat-free-board .hub-seat-free-desk.orient-270{width:var(--seat-narrow);height:var(--seat-long)}
+.hub-seat-free-board .hub-seat-free-head{margin:0;gap:3px;min-height:24px;flex-shrink:0}
+.hub-seat-free-board .hub-seat-free-grip{min-height:24px;height:24px;padding:1px 2px;white-space:nowrap;font-size:10px;line-height:1.2}
+.hub-seat-free-board .hub-seat-free-rotate{min-height:24px;min-width:23px;height:24px;width:23px;padding:0;font-size:17px;line-height:1}
+.hub-seat-free-board .hub-seat-pair{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--seat-gap)}
+.hub-seat-free-board .hub-seat-free-desk.orient-90 .hub-seat-pair,.hub-seat-free-board .hub-seat-free-desk.orient-270 .hub-seat-pair{grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr))}
+.hub-seat-free-board .hub-seat-free-desk.orient-180 .hub-seat-pair{direction:rtl}
+.hub-seat-free-board .hub-seat-free-desk.orient-270 .hub-seat-pair{display:flex;flex-direction:column-reverse}
+.hub-seat-free-board .hub-seat-free-desk.orient-270 .hub-seat-person{flex:1;min-height:0}
+.hub-seat-free-board .hub-seat-free-desk .hub-seat-person{min-height:0;font-size:var(--seat-font);padding:2px 1px;line-height:1.18;overflow-wrap:anywhere;word-break:break-word}
+.hub-seat-custom-tools .hub-seat-size-select{width:auto;min-width:155px;max-width:195px;padding:7px 9px;font-size:13px}
+.hub-seat-custom-tools .hub-seat-size-label{display:flex;align-items:center;gap:6px;margin:0;color:#173653;font-size:13px;font-weight:750}
+@media(max-width:760px){.hub-seat-free-board .hub-seat-free-desk{padding:2px}.hub-seat-free-board .hub-seat-free-grip{font-size:9px}.hub-seat-free-board .hub-seat-free-rotate{min-width:20px;width:20px}.hub-seat-free-board[data-desk-size="compact"]{--seat-font:9px}.hub-seat-free-board[data-desk-size="tiny"]{--seat-font:8px}}
+.hub-seat-free-board .hub-seat-free-remove{position:absolute;right:-6px;top:-9px;z-index:3;border:1px solid #e9b9bf;border-radius:99px;background:#fff4f5;color:#a5273b;min-width:22px;width:22px;height:22px;padding:0;font-size:17px;font-weight:800;line-height:1;cursor:pointer;touch-action:manipulation}
+.hub-seat-free-board .hub-seat-free-remove:hover{background:#fce2e5}
+.hub-seat-free-board .hub-seat-free-remove:focus-visible{outline:3px solid #e0a039;outline-offset:2px}
+@media(max-width:760px){.hub-seat-free-board .hub-seat-free-remove{min-width:20px;width:20px;height:20px}}
+@media print{body:has(#hub-seat-board) .hub-seat-free-remove{display:none!important}}
+.hub-seat-free-board .hub-seat-free-desk.hub-seat-round-desk{width:27%;height:178px;min-height:178px;padding:4px;border:0;background:transparent;box-shadow:none;overflow:visible}
+.hub-seat-free-board .hub-seat-round-desk .hub-seat-free-head{position:relative;z-index:4;justify-content:center;margin:0 auto 2px;width:80%}
+.hub-seat-free-board .hub-seat-round-desk .hub-seat-free-grip{height:29px;min-height:29px;background:#b8d9ee;border:1px solid #7faac5;border-radius:9px}
+.hub-seat-free-board .hub-seat-round-desk .hub-seat-pair{position:relative;display:block;flex:1;min-height:135px;direction:ltr}
+.hub-seat-round-middle{position:absolute;left:28%;top:18%;width:44%;height:66%;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;background:#dfedf4;border:3px solid #88a9c0;color:#42617a;font-weight:900;letter-spacing:.03em;font-size:10px;box-shadow:0 3px 6px #16395415}
+.hub-seat-free-board .hub-seat-round-desk .hub-seat-person{position:absolute;z-index:2;width:46%;height:32px;min-height:32px!important;max-height:35px;line-height:1.1;font-size:clamp(9px,.8vw,12px)!important;background:#fff;border:2px solid #8caec5;border-radius:9px;overflow:hidden}
+.hub-seat-round-desk .hub-seat-person:nth-of-type(1){left:27%;top:0}
+.hub-seat-round-desk .hub-seat-person:nth-of-type(2){right:0;top:48%;transform:translateY(-50%)}
+.hub-seat-round-desk .hub-seat-person:nth-of-type(3){left:27%;bottom:0}
+.hub-seat-round-desk .hub-seat-person:nth-of-type(4){left:0;top:48%;transform:translateY(-50%)}
+.hub-seat-round-desk .hub-seat-person.is-selected{background:#bce5ff}
+.hub-seat-free-board .hub-seat-round-desk .hub-seat-free-remove{z-index:5}
+@media(max-width:760px){.hub-seat-free-board .hub-seat-free-desk.hub-seat-round-desk{width:33%;height:165px;min-height:165px}.hub-seat-round-middle{font-size:8px}.hub-seat-free-board .hub-seat-round-desk .hub-seat-person{font-size:8px!important}}
+@media print{body:has(#hub-seat-board) .hub-seat-round-middle{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+.hub-seating aside.hub-seat-side{position:static;inset:auto;width:auto;display:block;z-index:auto}.hub-seating button,.hub-seating textarea,.hub-seating select{font-family:'Century Gothic',Arial,sans-serif}.hub-seating .hub-seat-free-wrap{overflow:auto}.hub-seating .hub-seat-free-board{min-width:550px}.hub-seating .hub-seat-free-board .hub-seat-free-desk button{letter-spacing:normal}.hub-seating .hub-seat-free-board .hub-seat-free-remove{padding:0}.hub-seating .hub-seat-free-board .hub-seat-free-rotate{padding:0}.hub-seating #seatNotice[hidden]{display:none}.hub-seating .hub-seat-toolbar .btn{background:var(--accent);color:white}.hub-seating .hub-seat-toolbar .secondary{background:var(--panel);color:var(--ink)}@media print{body:has(#hub-seat-board) *{visibility:hidden!important}body:has(#hub-seat-board) #hub-seat-board,body:has(#hub-seat-board) #hub-seat-board *{visibility:visible!important}body:has(#hub-seat-board) #hub-seat-board{position:absolute;left:0;top:0;width:100%;margin:0;background:white}body:has(#hub-seat-board) .hub-seat-help{display:none!important}}
 </style><style>
 .th-scope-head{margin-bottom:18px}.th-scope-kicker{font-size:11px;letter-spacing:1.8px;font-weight:700;color:var(--accent);margin-bottom:8px}.th-scope-head h2{font-size:clamp(23px,3vw,34px);margin-bottom:5px}.th-scope-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}.th-scope-stats>div{background:var(--soft);border-radius:10px;padding:12px}.th-scope-stats strong{display:block;font-size:26px}.th-scope-stats small{display:block}.th-subjects{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0 18px}.th-scope-head progress{width:100%;height:12px;accent-color:var(--accent);margin-top:10px}.th-termgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.th-term{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}.th-term header{position:static;background:transparent;border:0;padding:3px 2px 12px;display:block}.th-term header h3{font-size:21px;margin:0 0 4px}.th-topic{background:var(--panel);border:1px solid var(--line);border-top:5px solid var(--topic-colour);border-radius:11px;padding:12px;margin-bottom:12px;display:grid;gap:9px;min-width:0}.th-topic h3{font-size:16px;margin:0;overflow-wrap:anywhere}.th-topic p{font-size:13px;color:var(--muted);margin:0;overflow-wrap:anywhere}.th-topic-meta{display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:12px;flex-wrap:wrap}.th-topic-meta select,.th-topic-status{font-size:12px;max-width:100%}.th-topic-status[data-status="Taught"]{background:#dcebd6;color:#28472d}.th-topic-status[data-status="Teaching"]{background:#e0eaf7;color:#264760}.th-topic-status[data-status="Revisit"]{background:#f8e8bc;color:#66501e}.th-code{display:flex;gap:4px;flex-wrap:wrap}.th-code span{background:var(--soft);border-radius:4px;padding:3px 6px;font-size:11px;overflow-wrap:anywhere}.th-topic button,.th-term>button{width:100%;font-size:12px}.th-scope-editgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.th-scope-editgrid textarea{min-height:85px}.th-scope-editor{margin-bottom:18px}@media(max-width:1050px){.th-termgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.th-termgrid,.th-scope-editgrid{grid-template-columns:1fr}}
 </style><style id="cloud-login-styles">
@@ -81,7 +210,7 @@ function selectStudent(){return `<select onchange="studentId=this.value;studentV
 function chooseGrade(x){gradeSubject=x;render()}function effectiveGrade(g){if(!g)return '';if((g.mode||S.gradeMode)==='auto'&&g.percent!==''&&g.percent!=null){let p=Number(g.percent);return ['A','B','C','D'].find(k=>p>=Number(S.thresholds[k]))||'E'}return g.grade||''}function result(aid,sid,key,val){let a=S.assignments[gradeSubject].find(a=>a.id===aid);let g=a.results[sid]??={grade:'',percent:'',status:'',mode:S.gradeMode};g[key]=val;if(key==='percent'&&val!==''&&(Number(val)<0||Number(val)>100)){g.percent=String(Math.min(100,Math.max(0,Number(val))));}save();let el=document.getElementById('g-'+aid+'-'+sid);if(el){el.textContent=effectiveGrade(g);el.style.background=gradeColor(effectiveGrade(g))}}function gradeColor(g){return {A:'#cfe8cf',B:'#dbeac0',C:'#fff0bb',D:'#f8d8b9',E:'#f2c3c5'}[g]||'transparent'}function updateAssignment(id,key,v){S.assignments[gradeSubject].find(a=>a.id===id)[key]=v;save()}function grades(){let sub=gradeSubject,as=S.assignments[sub]||[];return title('Grades','Enter assignment results once. Student profiles display them automatically.')+`<div class="tabs">${subjects.map((x,i)=>`<button style="background:${colors[i]};${x===sub?'outline:2px solid var(--accent)':''}" onclick="chooseGrade(${J(x)})">${x}</button>`).join('')}</div><div class="card"><div class="row between"><h2>${sub} gradebook</h2><div class="row">${btn('＋ Assignment',"newAssignment()",'primary')}${btn('Export CSV','exportGrades()')}</div></div><div class="row section"><label>Default grading <select onchange="set(['gradeMode'],this.value,true)"><option value="manual" ${S.gradeMode==='manual'?'selected':''}>Manual A–E</option><option value="auto" ${S.gradeMode==='auto'?'selected':''}>Calculated A–E</option></select></label>${btn('Grade thresholds',"settings='Grading';go('Info & Settings')")}</div><div class="scroll"><table><thead><tr><th>Student</th>${as.map(a=>`<th style="min-width:215px"><input placeholder="Assignment name" value="${e(a.name)}" oninput="updateAssignment(${J(a.id)},'name',this.value)"><br><label>Weight <input type="number" min="0" max="1000" value="${e(a.weight??1)}" onchange="updateAssignment(${J(a.id)},'weight',Math.max(0,Number(this.value)||0));render()" style="width:70px"></label><br><input type="date" value="${e(a.date)}" oninput="updateAssignment(${J(a.id)},'date',this.value)"><select onchange="updateAssignment(${J(a.id)},'term',this.value)">${[1,2,3,4].map(t=>`<option value="${t}" ${String(t)===String(a.term)?'selected':''}>Term ${t}</option>`).join('')}</select>${btn('×',`deleteAssignment(${JSON.stringify(a.id)})`)}</th>`).join('')}</tr></thead><tbody>${S.students.map(s=>`<tr><td style="min-width:150px">${e(s.name||'Unnamed student')}</td>${as.map(a=>{let g=a.results[s.id]||{grade:'',percent:'',status:'',mode:S.gradeMode};let auto=(g.mode||S.gradeMode)==='auto';return `<td><div class="row" style="flex-wrap:nowrap"><select aria-label="Grade" ${auto?'disabled':''} onchange="result(${J(a.id)},${J(s.id)},'grade',this.value);render()">${['','A','B','C','D','E'].map(x=>`<option ${x===g.grade?'selected':''}>${x}</option>`).join('')}</select><input aria-label="Percentage" type="number" min="0" max="100" style="width:72px" value="${e(g.percent)}" oninput="result(${J(a.id)},${J(s.id)},'percent',this.value)" placeholder="%"><b id="g-${a.id}-${s.id}" class="pill" style="background:${gradeColor(effectiveGrade(g))}">${e(effectiveGrade(g))}</b></div><div class="row"><select aria-label="Grade mode" onchange="result(${J(a.id)},${J(s.id)},'mode',this.value);render()"><option value="manual" ${!auto?'selected':''}>Manual</option><option value="auto" ${auto?'selected':''}>Auto</option></select><select aria-label="Status" onchange="result(${J(a.id)},${J(s.id)},'status',this.value)">${['','Absent','Not assessed'].map(x=>`<option ${x===g.status?'selected':''}>${x}</option>`).join('')}</select></div></td>`}).join('')}</tr>`).join('')}</tbody></table></div>${!S.students.length?empty('Add your class list in Settings to enter grades.'):!as.length?empty('Add an assignment to begin.'):''}</div>`}function newAssignment(){(S.assignments[gradeSubject]??=[]).push({id:uid(),name:'',date:dateISO(new Date()),term:schoolDay(new Date()).term||1,results:{}});save();render()}function deleteAssignment(id){if(confirm('Delete this assignment and all its grades?')){S.assignments[gradeSubject]=S.assignments[gradeSubject].filter(x=>x.id!==id);save();render()}}function csvCell(x){let v=String(x??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replaceAll('"','""')+'"'}function exportGrades(){let a=S.assignments[gradeSubject]||[];let rows=[['Student',...a.flatMap(x=>[x.name+' grade',x.name+' %',x.name+' status'])],...S.students.map(s=>[s.name,...a.flatMap(x=>{let g=x.results[s.id]||{};return [effectiveGrade(g),g.percent,g.status]})])];download(gradeSubject+'-grades.csv',rows.map(r=>r.map(csvCell).join(',')).join('\n'),'text/csv')}
 function choosePlan(x){planning=x;render()}function chooseTerm(x){term=Number(x.slice(-1))-1;render()}function curriculum(){let base=title('Curriculum & Planning',`Year ${hubYear()} · Australian Curriculum v9 · Six learning areas`)+tabs(['Year overview','Term overview',...subjects],planning,'choosePlan');if(planning==='Year overview')return base+card('Year overview',area('Annual priorities, units, assessment and cross-curricular links',['plans','year']));if(planning==='Term overview')return base+tabs(['Term 1','Term 2','Term 3','Term 4'],'Term '+(term+1),'chooseTerm')+card('Term '+(term+1),area('Term plan',['plans','terms',term]));let sub=planning;S.plans.units[sub]??=[];let units=S.plans.units[sub];let descriptions=S.curriculum[sub]||STARTER[sub]||[];return base+`<div class="card section" style="border-top:7px solid ${lessonColor(sub)}"><div class="row between"><h2>${sub} unit plans</h2>${btn('＋ Unit',`S.plans.units[${JSON.stringify(sub)}].push({id:uid(),name:'',term:'1',notes:''});save();render()`,'primary')}</div>${units.map((u,i)=>`<div class="card section"><div class="row">${field('Unit title',['plans','units',sub,i,'name'])}<label>Term <select onchange="set(${J(['plans','units',sub,i,'term'])},this.value)">${[1,2,3,4].map(t=>`<option ${String(t)===u.term?'selected':''}>${t}</option>`).join('')}</select></label>${btn('Delete',`if(confirm('Delete unit?')){S.plans.units[${JSON.stringify(sub)}].splice(${i},1);save();render()}`)}</div>${area('Unit plan / learning goals / assessment',['plans','units',sub,i,'notes'])}</div>`).join('')}${units.length?'':empty('Add a unit to start planning.')}</div><div class="card"><div class="row between"><h2>Curriculum reference</h2>${btn('Import descriptions',"document.getElementById('currFile').click()")}${btn('Load available online descriptions','loadCurrOnline()')}</div><input id="currFile" type="file" accept=".json" hidden onchange="importCurr(this.files[0])"><p class="muted">${S.curriculum[sub]?'Imported descriptions. Check coverage against the official curriculum.':'Starter planning summaries, not complete official wording. The optional online loader covers available subjects, but not the full Arts curriculum.'} <a href="https://www.australiancurriculum.edu.au/" target="_blank" rel="noopener">Official Australian Curriculum v9</a></p><input placeholder="Filter curriculum" oninput="filterRows(this.value,'currTable')"><div class="scroll"><table id="currTable"><tr><th>Covered</th><th>Code / strand</th><th>Description</th></tr>${descriptions.map((x,i)=>{let k=sub+'-'+(x.code||i);return `<tr><td><input type="checkbox" ${S.coverage[k]?'checked':''} onchange="S.coverage[${J(k)}]=this.checked;save()"></td><td><b>${e(x.code||'')}</b><br>${e(x.strand||'')}</td><td>${e(x.description)}</td></tr>`}).join('')}</table></div></div>`}const STARTER=Object.fromEntries(Object.entries({English:['Language: how language choices shape relationships, identity and meaning','Language: text structures, cohesion, complex sentences, vocabulary and punctuation','Literature: perspectives, cultural contexts, literary devices and creative texts','Literacy: analyse sources, comprehend and create written, spoken and multimodal texts','Literacy: spelling, word knowledge and oral presentations'],Maths:['Number: integers, fractions, decimals, percentages, factors and multiples','Algebra: patterns, equations and unknown values','Measurement: metric units, area, volume, time and angles','Space: transformations, coordinates and three-dimensional objects','Statistics: investigate and interpret data distributions','Probability: compare and conduct chance experiments'],HASS:['History: Federation, Australian democracy and experiences of migration','Geography: global diversity and Australian interconnections','Civics and Citizenship: government, citizenship and democratic participation','Economics and Business: resources, choices and consumer decisions','Inquiry: question, research, analyse, evaluate and communicate'],Science:['Biological sciences: environmental conditions and living things','Chemical sciences: reversible and irreversible changes','Physical sciences: electrical circuits and energy','Earth and space sciences: Earth and the solar system','Science inquiry: investigate safely, collect and analyse evidence, communicate findings','Science as a human endeavour: applications and collaboration'], 'The Arts':['Dance: explore, develop, create and present dance','Drama: explore, develop, create and perform drama','Media Arts: explore, develop, create and present media works','Music: explore, develop, compose and perform music','Visual Arts: explore, develop, create and present artworks'],Technologies:['Design and Technologies: investigate needs, design solutions, produce and evaluate','Design and Technologies: materials, engineering, food and sustainability','Digital Technologies: digital systems, data representation and algorithms','Digital Technologies: design digital solutions, privacy and security']}).map(([k,v])=>[k,v.map(x=>({strand:x.split(':')[0],description:x.split(':').slice(1).join(':').trim()}))]));function importCurr(file){if(!file)return;file.text().then(t=>{let a=JSON.parse(t);if(!Array.isArray(a))throw Error();let map={English:'English',Mathematics:'Maths',Science:'Science','HASS F-6':'HASS','Humanities and Social Sciences':'HASS','Digital Technologies':'Technologies','Design and Technologies':'Technologies',Dance:'The Arts',Drama:'The Arts','Media Arts':'The Arts',Music:'The Arts','Visual Arts':'The Arts','The Arts':'The Arts'};let grouped={};for(let x of a){let sub=map[x.subject]||map[x.learningArea];let yr=Array.isArray(x.years)?x.years.map(String).includes('6'):/\b6\b/.test(String(x.year));if(sub&&yr&&x.code&&x.description)(grouped[sub]??=[]).push({code:String(x.code),strand:String(x.strand||x.subject||''),description:String(x.description)})}if(!Object.keys(grouped).length)throw Error();S.curriculum={...S.curriculum,...grouped};save();render();alert('Imported '+Object.values(grouped).flat().length+' Year 6 / Years 5–6 descriptions.')}).catch(()=>alert('Choose a curriculum JSON array with code, subject, year/years, description.'))}
 let clock={timer:300000,timerEnd:0,sw:0,swStart:0},diceN=2,diceSides=6,diceResult=[],winner='',brainPick='',rotation=0;function widgets(){let names=S.students.filter(x=>x.name&&!S.excluded.includes(x.id));return title('Widgets','Simple classroom tools, ready for the board.')+`<div class="grid">${card('⏳ Timer',`<div class="center"><div class="big" id="timerClock">05:00</div><div class="row" style="justify-content:center"><input type="number" min="0" max="999" id="minutes" value="${ext().timerMinutes??5}" onchange="ext().timerMinutes=this.value;save()" style="width:75px"> min <input type="number" min="0" max="59" id="seconds" value="${ext().timerSeconds??0}" onchange="ext().timerSeconds=this.value;save()" style="width:70px"> sec ${btn('Set','setTimer()')}</div><div class="row" style="justify-content:center">${btn('Start','startTimer()','primary')}${btn('Pause','pauseTimer()')}${btn('Reset','resetTimer()')}</div></div>`,'widget')}${card('⏱ Stopwatch',`<div class="center"><div class="big" id="swClock">00:00</div><div class="row" style="justify-content:center">${btn('Start','if(!clock.swStart)clock.swStart=Date.now()','primary')}${btn('Pause','if(clock.swStart){clock.sw+=Date.now()-clock.swStart;clock.swStart=0}')}${btn('Reset','clock.sw=0;clock.swStart=0;drawClock()')}</div></div>`,'widget')}${card('◉ Name wheel',`<div class="center"><div class="pointer">▼</div><div class="wheel" id="wheel" style="background:conic-gradient(${names.length?names.map((x,i)=>`${colors[i%6]} ${i*360/names.length}deg ${(i+1)*360/names.length}deg`).join(','):'#e4eddf 0deg 360deg'});transform:rotate(${rotation}deg)"><span>SPIN</span></div><h2 id="winner">${e(winner||'Choose a student')}</h2>${btn('Spin wheel','spin()','primary')}</div><details><summary>Edit eligible students</summary>${S.students.map(x=>`<label style="display:block"><input type="checkbox" ${!S.excluded.includes(x.id)?'checked':''} onchange="exclude(${J(x.id)},this.checked)"> ${e(x.name)}</label>`).join('')||empty('Add students in Settings.')}</details>`,'widget')}${card('⚄ Dice roller',`<div class="row"><label>Dice <input type="number" min="1" max="20" value="${diceN}" style="width:65px" onchange="diceN=Math.max(1,Math.min(20,Number(this.value)||1));ext().diceN=diceN;save()"></label><label>Sides <input type="number" min="2" max="100" value="${diceSides}" style="width:70px" onchange="diceSides=Math.max(2,Math.min(100,Number(this.value)||6));ext().diceSides=diceSides;save()"></label>${btn('Roll','rollDice()','primary')}</div><div class="row" style="margin:15px 0">${diceResult.map(x=>`<span class="card" style="padding:13px;font-size:28px;font-weight:bold">${x}</span>`).join('')}</div>${diceResult.length?'<h3>Total: '+diceResult.reduce((a,b)=>a+b,0)+'</h3>':''}`,'widget')}${card('🏆 Scoreboard',S.teams.map(x=>`<div class="row between">${inputRow('teams',x,'name')}<b style="font-size:25px">${x.score}</b>${btn('+1',`score(${JSON.stringify(x.id)},1)`)}${btn('−1',`score(${JSON.stringify(x.id)},-1)`)}${btn('×',`remove('teams',${JSON.stringify(x.id)})`)}</div>`).join('')+`<div class="row">${btn('＋ Team',"add('teams',{name:'New team',score:0})")}${btn('Reset scores',"S.teams.forEach(x=>x.score=0);save();render()")}</div>`,'widget')}${card('✦ Brain breaks',`<h2>${e(brainPick||'Ready for a break?')}</h2>${btn('Random break','pickBrain()','primary')}<details style="margin-top:15px"><summary>Edit brain breaks</summary><textarea oninput="S.brain=this.value.split('\n');save()">${e(S.brain.join('\n'))}</textarea></details>`,'widget')}</div>`}function setTimer(){clock.timer=Math.max(0,(Number($('minutes').value)*60+Number($('seconds').value))*1000);clock.timerEnd=0;clock.original=clock.timer;drawClock()}function startTimer(){if(!clock.timerEnd&&clock.timer>0)clock.timerEnd=Date.now()+clock.timer}function pauseTimer(){if(clock.timerEnd){clock.timer=Math.max(0,clock.timerEnd-Date.now());clock.timerEnd=0}}function resetTimer(){clock.timer=clock.original??300000;clock.timerEnd=0;drawClock()}function timeText(ms){let s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}function drawClock(){if(clock.timerEnd&&Date.now()>=clock.timerEnd){clock.timer=0;clock.timerEnd=0;if($('timerClock'))$('timerClock').style.color='#a43b39'}if($('timerClock'))$('timerClock').textContent=timeText(clock.timerEnd?clock.timerEnd-Date.now():clock.timer);if($('swClock'))$('swClock').textContent=timeText(clock.sw+(clock.swStart?Date.now()-clock.swStart:0))}setInterval(drawClock,200);function exclude(id,on){S.excluded=S.excluded.filter(x=>x!==id);if(!on)S.excluded.push(id);save();render()}function spin(){let a=S.students.filter(x=>x.name&&!S.excluded.includes(x.id));if(!a.length)return alert('Add or select student names first.');let i=Math.floor(Math.random()*a.length);let target=(360-(i+.5)*360/a.length)%360;rotation+=1800+((target-rotation%360+360)%360);$('wheel').style.transform=`rotate(${rotation}deg)`;winner=a[i].name;$('winner').textContent='Spinning…';setTimeout(()=>{if($('winner'))$('winner').textContent=winner},1000)}function rollDice(){diceResult=Array.from({length:diceN},()=>1+Math.floor(Math.random()*diceSides));render()}function score(id,n){let x=S.teams.find(x=>x.id===id);x.score+=n;save();render()}function pickBrain(){let a=S.brain.filter(x=>x.trim());brainPick=a.length?a[Math.floor(Math.random()*a.length)]:'Add a brain break first';render()}
-function chooseSettings(x){settings=x;render()}function parseCSV(line){let a=[],v='',quote=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(quote&&line[i+1]==='"'){v+='"';i++}else quote=!quote}else if(c===','&&!quote){a.push(v.trim());v=''}else v+=c}a.push(v.trim());return a}function bulkImport(list,text){let lines=text.split(/\r?\n/).filter(x=>x.trim());let count=0;for(let line of lines){let [a,b]=parseCSV(line);if(list==='students'){if(!a||/^(name|student name)$/i.test(a))continue;S.students.push(newStudent(a,b||''));count++}else{if(!/^\d{4}-\d{2}-\d{2}$/.test(a)||!b||isNaN(dateObj(a)))continue;S[list].push({id:uid(),date:a,name:b});count++}}save();render();alert('Imported '+count+' entries.')}function importFile(list,file){if(file)file.text().then(t=>bulkImport(list,t))}function bulkBox(list){return `<details class="section"><summary>Bulk paste / CSV import</summary><p class="muted">${list==='students'?'One name per line, or name, YYYY-MM-DD birthday.':'One date, name per line. Use YYYY-MM-DD dates.'}</p><textarea id="bulkText" placeholder="${list==='students'?'Student name, 2015-03-12':'2027-03-02, Pancake Day'}"></textarea><div class="row">${btn('Import pasted entries',`bulkImport(${JSON.stringify(list)},$('bulkText').value)`)}<input type="file" accept=".csv,.txt" onchange="importFile(${J(list)},this.files[0])"></div></details>`}function dateList(list,label,optional=false){return `<div class="card"><div class="row between"><h2>${label}</h2>${btn('＋ Add',`add(${JSON.stringify(list)},{date:${optional?"''":'dateISO(new Date())'},name:''})`,'primary')}</div>${list==='fun'?bulkBox('fun'):''}<div class="scroll"><table><tr><th>Date ${optional?'(optional)':''}</th><th>Name / details</th><th></th></tr>${S[list].map(x=>`<tr><td>${inputRow(list,x,'date','date')}</td><td>${inputRow(list,x,'name')}</td><td>${btn('Delete',`remove(${JSON.stringify(list)},${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>${S[list].length?'':empty('No entries yet.')}</div>`}function settingsPage(){let base=title('Info & Settings','Set up the information that powers your Hub.')+tabs(['General','Class list','School calendar','Events','Reminders','Timetable','Instrument lessons','Quotes','Fun days','Grading','Data & backup'],settings,'chooseSettings');switch(settings){case'General':return base+card('Classroom details',`<div class="grid"><label class="field">Hub name (top-left title)<input type="text" maxlength="60" placeholder="The Teacher Hub" value="${e(S.hubName??'The Teacher Hub')}" oninput="set(['hubName'],this.value)"><small class="muted">Leave blank to use The Teacher Hub.</small></label>${field('Teacher name',['teacher'])}${field('School name',['school'])}${field('Class name (optional custom label)',['className'])}<label class="field">Teaching year level<select onchange="hubSelectYear(this.value)">${[1,2,3,4,5,6].map(y=>`<option value="${y}" ${hubYear()===y?'selected':''}>Year ${y}</option>`).join('')}</select></label><label class="field">School year<select onchange="calendarYear(this.value)">${[2027,2028,2029,2030].map(y=>`<option ${Number(S.year)===y?'selected':''}>${y}</option>`).join('')}</select></label></div><p class="muted">The teaching year level controls planning and DIBELS. Class names can be customised independently. Changing year levels preserves each level’s planning and assessment records.</p>`)+themeGallery();case'Class list':return base+card('Class list · '+S.students.length,btn('＋ Student',"S.students.push(newStudent());save();render()",'primary')+bulkBox('students')+`<div class="scroll"><table><tr><th>Student name</th><th>Birthday</th><th></th></tr>${S.students.map((x,i)=>`<tr><td>${inputRow('students',x,'name')}</td><td>${inputRow('students',x,'birthday','date')}</td><td>${btn('Remove',`dropStudent(${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>`);case'School calendar':return base+`<div class="card section"><h2>Term dates</h2><p class="muted">South Australian term dates load when selecting a year. Edit dates and closures for your school.</p>${S.terms.map((x,i)=>`<div class="row section"><b>Term ${i+1}</b>${field('Start',['terms',i,0],'date')}${field('End',['terms',i,1],'date')}</div>`).join('')}<div class="row"><label>Preview date <input type="date" value="${e(preview)}" onchange="preview=this.value"></label>${btn('Preview dashboard',"go('Dashboard')")}${btn('Use today',"preview='';go('Dashboard')")}</div></div>`+dateList('holidays','Public holidays & pupil-free days');case'Events':return base+dateList('events','School events');case'Reminders':return base+dateList('reminders','Class reminders',true);case'Fun days':return base+dateList('fun','Special / fun days');case'Timetable':return base+card('Weekly timetable',empty('The same timetable is used in Daily Classroom and on the Dashboard.')+btn('Open timetable',"go('Daily Classroom')",'primary'));case'Instrument lessons':return base+card('Instrument lessons',btn('＋ Lesson',"add('music',{day:'Monday',time:'09:00',student:'',name:''})",'primary')+`<div class="scroll"><table><tr><th>Day</th><th>Time</th><th>Student</th><th>Instrument</th><th></th></tr>${S.music.map(x=>`<tr><td><select onchange="update('music',${J(x.id)},'day',this.value)">${days.map(d=>`<option ${d===x.day?'selected':''}>${d}</option>`).join('')}</select></td><td>${inputRow('music',x,'time','time')}</td><td><select onchange="update('music',${J(x.id)},'student',this.value)"><option value="">Choose</option>${S.students.map(s=>`<option value="${e(s.id)}" ${x.student===s.id?'selected':''}>${e(s.name)}</option>`).join('')}</select></td><td>${inputRow('music',x,'name')}</td><td>${btn('Delete',`remove('music',${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>`);case'Quotes':return base+card('Quote list',btn('＋ Quote',"add('quotes',{name:''})",'primary')+S.quotes.map(x=>`<div class="row section"><textarea style="flex:1;min-height:55px" oninput="update('quotes',${J(x.id)},'name',this.value)">${e(x.name)}</textarea>${btn('Delete',`remove('quotes',${JSON.stringify(x.id)})`)}</div>`).join(''));case'Grading':return base+card('Grade thresholds',`<p>Editable minimum percentages for calculated grades. These are example thresholds, not official school cut-offs.</p><div class="grid">${['A','B','C','D'].map(x=>field(x+' minimum %',['thresholds',x],'number')).join('')}</div><p>E is below D. Manual grades remain independent.</p>`);case'Data & backup':return base+card('Local saving & backups',`<p>Changes save automatically in this browser. Backups contain confidential information, so store them securely.</p><div class="row">${btn('Export backup','backup()','primary')}<label>Import backup <input type="file" accept=".json" onchange="restore(this.files[0])"></label></div><p class="notice">Cloud sync is not connected. GitHub Pages hosts the application, not private student records. Firestore requires authenticated, owner-only access before real records are uploaded.</p>${btn('Reset all local data',"if(confirm('Permanently erase all Hub data on this device?')){S=defaults();save();go('Dashboard')}",'danger')}`)}}
+function chooseSettings(x){settings=x;render()}function parseCSV(line){let a=[],v='',quote=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'){if(quote&&line[i+1]==='"'){v+='"';i++}else quote=!quote}else if(c===','&&!quote){a.push(v.trim());v=''}else v+=c}a.push(v.trim());return a}function bulkImport(list,text){let lines=text.split(/\r?\n/).filter(x=>x.trim());let count=0;for(let line of lines){let [a,b]=parseCSV(line);if(list==='students'){if(!a||/^(name|student name)$/i.test(a))continue;S.students.push(newStudent(a,b||''));count++}else{if(!/^\d{4}-\d{2}-\d{2}$/.test(a)||!b||isNaN(dateObj(a)))continue;S[list].push({id:uid(),date:a,name:b});count++}}save();render();alert('Imported '+count+' entries.')}function importFile(list,file){if(file)file.text().then(t=>bulkImport(list,t))}function bulkBox(list){return `<details class="section"><summary>Bulk paste / CSV import</summary><p class="muted">${list==='students'?'One name per line, or name, YYYY-MM-DD birthday.':'One date, name per line. Use YYYY-MM-DD dates.'}</p><textarea id="bulkText" placeholder="${list==='students'?'Student name, 2015-03-12':'2027-03-02, Pancake Day'}"></textarea><div class="row">${btn('Import pasted entries',`bulkImport(${JSON.stringify(list)},$('bulkText').value)`)}<input type="file" accept=".csv,.txt" onchange="importFile(${J(list)},this.files[0])"></div></details>`}function dateList(list,label,optional=false){return `<div class="card"><div class="row between"><h2>${label}</h2>${btn('＋ Add',`add(${JSON.stringify(list)},{date:${optional?"''":'dateISO(new Date())'},name:''})`,'primary')}</div>${list==='fun'?bulkBox('fun'):''}<div class="scroll"><table><tr><th>Date ${optional?'(optional)':''}</th><th>Name / details</th><th></th></tr>${S[list].map(x=>`<tr><td>${inputRow(list,x,'date','date')}</td><td>${inputRow(list,x,'name')}</td><td>${btn('Delete',`remove(${JSON.stringify(list)},${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>${S[list].length?'':empty('No entries yet.')}</div>`}function settingsPage(){let base=title('Info & Settings','Set up the information that powers your Hub.')+tabs(['General','Class list','School calendar','Events','Reminders','Timetable','Instrument lessons','Quotes','Fun days','Grading','Data & backup'],settings,'chooseSettings');switch(settings){case'General':return base+card('Classroom details',`<div class="grid"><label class="field">Hub name (top-left title)<input type="text" maxlength="60" placeholder="The Teacher Hub" value="${e(S.hubName??'The Teacher Hub')}" oninput="set(['hubName'],this.value)"><small class="muted">Leave blank to use The Teacher Hub.</small></label>${field('Teacher name',['teacher'])}${field('School name',['school'])}${field('Class name (optional custom label)',['className'])}<label class="field">Teaching year level<select onchange="hubSelectYear(this.value)">${[1,2,3,4,5,6].map(y=>`<option value="${y}" ${hubYear()===y?'selected':''}>Year ${y}</option>`).join('')}</select></label><label class="field">School year<select onchange="calendarYear(this.value)">${[2027,2028,2029,2030].map(y=>`<option ${Number(S.year)===y?'selected':''}>${y}</option>`).join('')}</select></label></div><p class="muted">The teaching year level controls planning and DIBELS. Class names can be customised independently. Changing year levels preserves each level’s planning and assessment records.</p>`)+themeGallery();case'Class list':return base+card('Class list · '+S.students.length,btn('＋ Student',"S.students.push(newStudent());save();render()",'primary')+bulkBox('students')+`<div class="scroll"><table><tr><th>Student name</th><th>Birthday</th><th></th></tr>${S.students.map((x,i)=>`<tr><td>${inputRow('students',x,'name')}</td><td>${inputRow('students',x,'birthday','date')}</td><td>${btn('Remove',`dropStudent(${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>`);case'School calendar':return base+`<div class="card section"><h2>Term dates</h2><p class="muted">South Australian term dates load when selecting a year. Edit dates and closures for your school.</p>${S.terms.map((x,i)=>`<div class="row section"><b>Term ${i+1}</b>${field('Start',['terms',i,0],'date')}${field('End',['terms',i,1],'date')}</div>`).join('')}<div class="row"><label>Preview date <input type="date" value="${e(preview)}" onchange="preview=this.value"></label>${btn('Preview dashboard',"go('Dashboard')")}${btn('Use today',"preview='';go('Dashboard')")}</div></div>`+dateList('holidays','Public holidays & pupil-free days');case'Events':return base+dateList('events','School events');case'Reminders':return base+dateList('reminders','Class reminders',true);case'Fun days':return base+dateList('fun','Special / fun days');case'Timetable':return base+card('Weekly timetable',empty('The same timetable is used in Planner and on the Dashboard.')+btn('Open timetable',"go('Daily Classroom')",'primary'));case'Instrument lessons':return base+card('Instrument lessons',btn('＋ Lesson',"add('music',{day:'Monday',time:'09:00',student:'',name:''})",'primary')+`<div class="scroll"><table><tr><th>Day</th><th>Time</th><th>Student</th><th>Instrument</th><th></th></tr>${S.music.map(x=>`<tr><td><select onchange="update('music',${J(x.id)},'day',this.value)">${days.map(d=>`<option ${d===x.day?'selected':''}>${d}</option>`).join('')}</select></td><td>${inputRow('music',x,'time','time')}</td><td><select onchange="update('music',${J(x.id)},'student',this.value)"><option value="">Choose</option>${S.students.map(s=>`<option value="${e(s.id)}" ${x.student===s.id?'selected':''}>${e(s.name)}</option>`).join('')}</select></td><td>${inputRow('music',x,'name')}</td><td>${btn('Delete',`remove('music',${JSON.stringify(x.id)})`)}</td></tr>`).join('')}</table></div>`);case'Quotes':return base+card('Quote list',btn('＋ Quote',"add('quotes',{name:''})",'primary')+S.quotes.map(x=>`<div class="row section"><textarea style="flex:1;min-height:55px" oninput="update('quotes',${J(x.id)},'name',this.value)">${e(x.name)}</textarea>${btn('Delete',`remove('quotes',${JSON.stringify(x.id)})`)}</div>`).join(''));case'Grading':return base+card('Grade thresholds',`<p>Editable minimum percentages for calculated grades. These are example thresholds, not official school cut-offs.</p><div class="grid">${['A','B','C','D'].map(x=>field(x+' minimum %',['thresholds',x],'number')).join('')}</div><p>E is below D. Manual grades remain independent.</p>`);case'Data & backup':return base+card('Local saving & backups',`<p>Changes save automatically in this browser. Backups contain confidential information, so store them securely.</p><div class="row">${btn('Export backup','backup()','primary')}<label>Import backup <input type="file" accept=".json" onchange="restore(this.files[0])"></label></div><p class="notice">Cloud sync is not connected. GitHub Pages hosts the application, not private student records. Firestore requires authenticated, owner-only access before real records are uploaded.</p>${btn('Reset all local data',"if(confirm('Permanently erase all Hub data on this device?')){S=defaults();save();go('Dashboard')}",'danger')}`)}}
 async function loadCurrOnline(){try{let r=await fetch('https://raw.githubusercontent.com/curiousape-ai/acara-v9-f6-json/main/data/acara-v9-f6-content-descriptions.json');if(!r.ok)throw Error();await importCurr(new Blob([await r.text()]));}catch(err){alert('Online curriculum unavailable. Download the public JSON and use Import descriptions.')}}
 
 const modules=['Teacher Organisation','Classroom Management','Assessment Dashboard','Reporting Centre','Literacy','Numeracy'];
@@ -175,7 +304,8 @@ function dbPrint(sid){let s=S.students.find(x=>x.id===sid);if(!s)return;let w=wi
 @media(max-width:760px){#app .hero{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"greeting date" "actions actions";gap:12px;padding:14px 16px}#app .hero .row.hideboard{flex-direction:row;justify-content:flex-end}#app .hero .hero-date{padding:9px 12px}#app .hero .hero-date strong{font-size:16px}#app .hero .hero-date span{font-size:11px}}
 @media(max-width:400px){#app .hero{grid-template-columns:1fr;grid-template-areas:"greeting" "date" "actions"}#app .hero .hero-date{white-space:normal}}
 </style>
-<style>#cloudGate [hidden]{display:none!important}#cloudGate #registerToggle{margin-top:8px;color:#355d45;background:#edf3e9;border-color:#dce5d9;font-size:13px}#cloudGate #verifyActions{display:grid;gap:10px}#cloudGate #checkVerification{background:#355d45;color:white}#cloudGate #registerFields{display:grid;gap:14px}</style><style>.ac-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:16px 0}.ac-stat{display:grid;gap:8px;text-align:left;background:var(--panel,#fff);padding:12px;border:1px solid var(--line,#ddd);border-radius:12px;color:var(--text,inherit)}.ac-stat strong{font-size:21px}.ac-stat progress{width:100%}.ac-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:12px 0}.ac-controls select,.ac-controls input{width:100%;min-width:0}.ac-record{margin:12px 0}.ac-record p{line-height:1.6}.ac-record details{margin:10px 0;padding:10px;background:var(--soft);border-radius:8px}.ac-record summary{cursor:pointer;font-weight:bold}.ac-record li{margin:8px 0}.ac-record textarea{min-height:64px}</style></head><body><h1>Reading assessment · Year ${dbGrade()}</h1>${dbProfile(s)}<h2>Progress monitoring</h2><table><tr><th>Date</th><th>Probe</th><th>ORF</th><th>Accuracy</th><th>MAZE</th><th>Notes</th></tr>${pmList(s.id).map(r=>`<tr><td>${e(r.date)}</td><td>${e(r.form)}</td>${dbValues(r).map(v=>`<td>${v??'—'}</td>`).join('')}<td>${e(r.note)}</td></tr>`).join('')}</table></body></html>`);w.document.close();w.focus();w.print()}
+<style>#cloudGate [hidden]{display:none!important}#cloudGate #registerToggle{margin-top:8px;color:#355d45;background:#edf3e9;border-color:#dce5d9;font-size:13px}#cloudGate #verifyActions{display:grid;gap:10px}#cloudGate #checkVerification{background:#355d45;color:white}#cloudGate #registerFields{display:grid;gap:14px}</style><style>.ac-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:16px 0}.ac-stat{display:grid;gap:8px;text-align:left;background:var(--panel,#fff);padding:12px;border:1px solid var(--line,#ddd);border-radius:12px;color:var(--text,inherit)}.ac-stat strong{font-size:21px}.ac-stat progress{width:100%}.ac-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:12px 0}.ac-controls select,.ac-controls input{width:100%;min-width:0}.ac-record{margin:12px 0}.ac-record p{line-height:1.6}.ac-record details{margin:10px 0;padding:10px;background:var(--soft);border-radius:8px}.ac-record summary{cursor:pointer;font-weight:bold}.ac-record li{margin:8px 0}.ac-record textarea{min-height:64px}</style><style>.pl-page{min-width:0}.pl-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.pl-heading h1{margin:0}.pl-heading p{margin:4px 0}.pl-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}.pl-toolbar button{padding:8px 12px}.pl-toolbar input{width:auto;max-width:160px}.pl-scroll{overflow-x:auto;padding-bottom:12px}.pl-week{display:grid;grid-template-columns:repeat(5,minmax(180px,1fr));gap:6px;min-width:940px;align-items:start}.pl-day{background:var(--card,#fff);border:1px solid var(--line,#dce5d9);border-radius:8px;min-width:0;overflow:hidden}.pl-day-head{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:9px 9px;background:#edf0ed;color:#355d45;border-bottom:1px solid #dce5d9;font-size:14px}.pl-day-head.today{background:#ffe477;color:#273d32}.pl-day-head strong{font-size:15px}.pl-day-head button{padding:2px 7px;border:0;background:transparent;box-shadow:none}.pl-day-body{padding:6px;display:flex;flex-direction:column;gap:7px;min-height:230px}.pl-lesson{border:1px solid var(--lesson-colour);border-radius:6px;overflow:hidden;box-shadow:0 2px 5px #0000000b}.pl-lesson-head{width:100%;display:flex!important;justify-content:space-between;align-items:center;text-align:left;padding:9px!important;border:0!important;border-radius:0!important;white-space:normal!important;min-width:0;box-shadow:none!important}.pl-lesson-head span:first-child{min-width:0}.pl-lesson-head strong,.pl-lesson-head small{display:block;overflow-wrap:anywhere;color:inherit}.pl-lesson-head strong{font-size:14px}.pl-lesson-head small{font-size:13px;font-weight:400;margin-top:3px}.pl-focus,.pl-notes{background:#fff;color:#313e35;padding:6px 8px;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;cursor:pointer}.pl-focus{font-weight:700;border-bottom:1px solid #e5e8e4}.pl-event{background:#f5eac7;color:#5b4a25;padding:9px;border-radius:6px;font-size:13px}.pl-add{width:100%;background:transparent!important;border:1px dashed #cbd7cb!important;font-size:12px!important;padding:7px!important;color:var(--muted)!important}.pl-repeat{border:0!important}.pl-dialog{width:min(620px,94vw);max-height:90vh;overflow:auto;padding:22px;border:1px solid #dbe4db;border-radius:15px;background:var(--card,#fff);color:var(--text,#253b30);font-family:inherit;box-shadow:0 20px 80px #0003}.pl-dialog::backdrop{background:#152c2090}.pl-dialog form{display:grid;gap:9px}.pl-dialog input,.pl-dialog textarea,.pl-dialog select{width:100%;font-family:inherit}.pl-times{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.pl-dialog textarea{min-height:160px;resize:vertical}@media(max-width:700px){.pl-heading{align-items:flex-start;flex-direction:column}.pl-toolbar{align-items:flex-start}.pl-times{grid-template-columns:1fr 1fr}}@media print{.pl-toolbar,.pl-heading .row,.pl-add,.pl-day-head button{display:none!important}.pl-scroll{overflow:visible}.pl-week{min-width:0;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}.pl-day,.pl-lesson{break-inside:avoid}.pl-lesson-head{print-color-adjust:exact;-webkit-print-color-adjust:exact}.pl-notes{font-size:10px}}
+</style></head><body><h1>Reading assessment · Year ${dbGrade()}</h1>${dbProfile(s)}<h2>Progress monitoring</h2><table><tr><th>Date</th><th>Probe</th><th>ORF</th><th>Accuracy</th><th>MAZE</th><th>Notes</th></tr>${pmList(s.id).map(r=>`<tr><td>${e(r.date)}</td><td>${e(r.form)}</td>${dbValues(r).map(v=>`<td>${v??'—'}</td>`).join('')}<td>${e(r.note)}</td></tr>`).join('')}</table></body></html>`);w.document.close();w.focus();w.print()}
 dbPage=function(){let g=dbGrade(),s=S.students.find(x=>x.id===dbStudent)||S.students[0];if(s)dbStudent=s.id;let top=card('Assessment year level',`<p><b>Year ${g}</b> · linked to Info &amp; Settings. ${g===1?'ORF only; MAZE begins in Year 2.':'ORF and MAZE benchmark assessments.'}</p>${btn('Change teaching year',"settings='General';go('Info & Settings')")}`)+tabs(['Core assessment','Composite scores','Suggested groups','Progress monitoring','Paired growth','Print profile'],dbNewView||'Core assessment','dbNewPick');if(!dbNewView||dbNewView==='Core assessment'){let html=oldDbPage().replaceAll('Year 6 benchmarks',`Year ${g} benchmarks`).replaceAll('Year 6 minimum',`Year ${g} minimum`).replace('Restore Year 6 defaults','Restore selected year defaults').replace('structuredClone(dbGoals);save();render()','structuredClone(dbLevels[dbGrade()]);save();render()');if(g===1)html=html.replace('Year 1 benchmarks ·','Year 1 benchmarks (MAZE not applicable) ·');return top+html}if(dbNewView==='Paired growth')return top+dbPairs();if(dbNewView==='Suggested groups')return top+dbGroups();if(dbNewView==='Composite scores')return top+tabs(dbPeriods,dbPeriods[dbPeriod],'dbSelectPeriod')+card('Composite scores',`<p>${g===1?'Enter the official composite from the complete Year 1 scoring worksheet.':'Calculated using the official grade-specific weights when every required measure is present. No discontinued or gated scores are inferred.'}</p><div class="scroll"><table><tr><th>Student</th>${(g===1?['officialComposite']:extraKeys()).map(k=>`<th>${k}</th>`).join('')}<th>ORF</th><th>Accuracy</th><th>MAZE</th><th>Composite</th></tr>${S.students.map(s=>`<tr><th>${e(s.name)}</th>${(g===1?['officialComposite']:extraKeys()).map(k=>`<td>${dbExtraInput(s,dbPeriod,k)}</td>`).join('')}${dbValues(dbRecord(s.id,dbPeriod)).map(v=>`<td>${v??'—'}</td>`).join('')}<td>${compChip(s.id,dbPeriod)}</td></tr>`).join('')}</table></div>`);return top+dbSelectStudent()+(s?(dbNewView==='Print profile'?card('Printable reading report',btn('Print / Save PDF',`dbPrint(${JSON.stringify(s.id)})`))+dbProfile(s):pmPage(s)):empty('Add students first.'))};
 
 const dbProfileBase=dbProfile;dbProfile=function(s){return dbProfileBase(s)+card('Composite summary',dbPeriods.map((p,i)=>`<p>${p}: ${compChip(s.id,i)}</p>`).join(''))};
@@ -293,6 +423,417 @@ function acOpenSubject(a){acArea=a;acSubject=acPath=acStrand=acQuery='';acMode='
 curriculum=function(){if(planning==='Official curriculum')return title('Curriculum & Planning',`Year ${hubYear()} · Australian Curriculum v9`)+tabs(['Scope & Sequence','Year overview','Term overview','Official curriculum',...subjects],planning,'choosePlan')+acView();let html=hubCurriculumBefore();html=html.replace(/(<div class="tabs [^>]*>)/,'$1'+btn('Official curriculum',"choosePlan('Official curriculum')"));html=html.replace('Six learning areas','Eight learning areas');if(officialAreas.includes(planning)){let idx=html.indexOf('<div class="card"><div class="row between"><h2>Curriculum reference</h2>');if(idx>=0)html=html.slice(0,idx);html+=card('Official curriculum reference',`<p>${acFor(planning).length} official descriptions for Year ${hubYear()}, including applicable bands and pathways.</p>${btn('Browse official descriptions and track coverage',`acOpenSubject(${JSON.stringify(planning)})`,'primary')}`)}return html};
 
 window.TeacherHub={getData:()=>structuredClone(S),replaceData:data=>{if(data?.version!==1)throw Error('Unsupported backup');S={...defaults(),...data};save();render()},storageKey:KEY};let lastDate=dateISO(new Date());setInterval(()=>{let d=dateISO(new Date());if(d!==lastDate){lastDate=d;if(window.hubAccount&&page==='Dashboard'&&!preview)render()}},30000);
+
+// Original Year 3 seating engine, integrated into authenticated Teacher Hub state.
+function seatIsOpen(){return page==='Classroom Management'&&(moduleTab[page]||moduleTabs[page][0])==='Seating planner'}
+function seatSave(){const d=ext().year3Seating;if(d?.layouts)d.layouts[d.layout]=d.assignments.slice();save()}
+function seatNotice(message){let n=document.getElementById('seatNotice');if(n){n.textContent=message;n.hidden=false;clearTimeout(n._hide);n._hide=setTimeout(()=>{n.hidden=true},4000)}}
+function seatInitial(migrate){const names=S.students.map(st=>st.id),legacy=migrate&&Array.isArray(ext().roomDesks)?ext().roomDesks:[],count=Math.min(20,Math.max(12,Math.ceil(names.length/2),legacy.length));let positions=seatDefaultDeskPositions('tall3');while(positions.length<count)positions.push(seatExtraDeskPosition(positions.length));let assignments=Array(count*2).fill(null);if(migrate){if(legacy.length){const height=Math.max(600,...legacy.map(d=>Number(d.y||0)+160));legacy.slice(0,count).forEach((d,i)=>{positions[i]={x:Math.max(0,Math.min(83,Number(d.x||0)/960*100)),y:Math.max(5,Math.min(80,Number(d.y||0)/height*100)),rotation:((Math.round(Number(d.r||0)/90)*90)%360+360)%360};assignments[i*2]=d.a||null;assignments[i*2+1]=d.b||null})}else{for(let i=0;i<assignments.length;i++)assignments[i]=ext().seats?.[i]||null}}return {students:names,assignments,layout:'custom',layouts:{custom:assignments.slice()},customDesks:positions,customSnap:false,customDeskSize:'compact',preferMixedPairs:false,pairCategories:{}}}
+const HUB_SEAT_COUNT=24;
+const HUB_SEAT_MAX_DESKS=20; // Preset layouts remain at 12 desks. Custom can add eight more.
+function seatCustomCapacity(desks){return desks.reduce((n,p)=>n+(p.type==='round'?4:2),0)}
+function seatCapacity(d){return d.layout===HUB_SEAT_LAYOUT_CUSTOM ? Math.max(HUB_SEAT_COUNT,seatCustomCapacity(d.customDesks||seatDefaultDeskPositions())) : HUB_SEAT_COUNT;}
+function seatDeskCount(d){return seatCapacity(d)/2;}
+function seatOffset(d,i){return d.customDesks.slice(0,i).reduce((n,p)=>n+(p.type==='round'?4:2),0)}
+function seatRoundIndex(d){return d.customDesks.findIndex(p=>p.type==='round')}
+const HUB_SEAT_DEFAULTS=[];
+let hubSelectedSeat=null,hubSelectedUnseated=null;
+const HUB_PAIR_VALUES=new Set(['boy','girl','']);
+function seatShuffle(input){const a=input.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function seatMixedRandomOrder(d){
+ // Fill each consecutive pair of indices as one physical two-seat desk in every layout.
+ // No gender is guessed. Unspecified students are seated normally.
+ const boys=seatShuffle(d.students.filter(n=>d.pairCategories[n]==='boy'));
+ const girls=seatShuffle(d.students.filter(n=>d.pairCategories[n]==='girl'));
+ const unspecified=seatShuffle(d.students.filter(n=>d.pairCategories[n]!=='boy'&&d.pairCategories[n]!=='girl'));
+ const pairs=[];
+ while(boys.length&&girls.length&&pairs.length<seatDeskCount(d)){
+  const pair=[boys.pop(),girls.pop()];
+  if(Math.random()<.5)pair.reverse();
+  pairs.push(pair);
+ }
+ const extras=seatShuffle([...boys,...girls,...unspecified]);
+ while(extras.length&&pairs.length<seatDeskCount(d))pairs.push(extras.splice(0,2));
+ return seatShuffle(pairs).flat().slice(0,seatCapacity(d));
+}
+function seatMixedCount(d){let count=0;for(let i=0;i<seatCapacity(d);i+=2){const a=d.assignments[i],b=d.assignments[i+1];if(a&&b&&((d.pairCategories[a]==='boy'&&d.pairCategories[b]==='girl')||(d.pairCategories[a]==='girl'&&d.pairCategories[b]==='boy')))count++}return count}
+
+const HUB_SEAT_LAYOUT_ORIGINAL='classic';
+const HUB_SEAT_LAYOUT_TALL='tall3';
+const HUB_SEAT_LAYOUT_CUSTOM='custom';
+let hubDeskDrag=null;
+function seatDefaultDeskPositions(source='tall3'){
+ // Percentage positions within the room drawing. Each desk has two student seats.
+ if(source==='classic'){
+  return [[3,7],[3,33],[28,33],[53,33],[77,33],[3,56],[28,56],[53,56],[77,56],[28,79],[53,79],[77,79]].map(([x,y])=>({x,y,rotation:0,vertical:false}));
+ }
+ return Array.from({length:12},(_,i)=>({x:[3,28,53,77][i%4],y:[7,37,67][Math.floor(i/4)],rotation:90,vertical:true}));
+}
+function seatExtraDeskPosition(i){
+ // Use free space within the existing 690px classroom drawing.
+ // Four desks can sit below the existing back row; others use column gaps.
+ const slots=[[4,86],[27,86],[50,86],[73,86],[13,40],[38,40],[63,40],[13,10]];
+ const [x,y]=slots[Math.max(0,Math.min(slots.length-1,i-12))];
+ return {x,y,rotation:0,vertical:false};
+}
+function seatValidateDeskPositions(list){
+ const defaults=seatDefaultDeskPositions('tall3');
+ const count=Math.max(12,Math.min(HUB_SEAT_MAX_DESKS+1,Array.isArray(list)?list.length:12));
+ let roundSeen=false;
+ return Array.from({length:count},(_,i)=>{
+  const p=list?.[i],d=defaults[i]||seatExtraDeskPosition(i);
+  const x=Number(p?.x),y=Number(p?.y);
+  const rotation=[0,90,180,270].includes(Number(p?.rotation))?Number(p.rotation):(typeof p?.vertical==='boolean'?(p.vertical?90:0):d.rotation);
+  const type=p?.type==='round'&&!roundSeen&&i>=12?'round':'desk';if(type==='round')roundSeen=true;
+  return {x:Number.isFinite(x)?Math.max(0,Math.min(96,x)):d.x,y:Number.isFinite(y)?Math.max(0,Math.min(96,y)):d.y,rotation,vertical:rotation===90||rotation===270,type};
+ });
+}
+function seatFreeDesk(i){
+ const d=seatData(),p=d.customDesks[i],a=d.assignments;
+ const start=seatOffset(d,i);
+ const names=Array.from({length:p.type==='round'?4:2},(_,j)=>start+j).map(idx=>{
+  const name=a[idx],selected=hubSelectedSeat===idx;
+  return `<button type="button" class="hub-seat-person ${name===null?'is-empty':''} ${selected?'is-selected':''} ${hubSelectedUnseated?'is-target':''}" data-seat-action="seat" data-seat-index="${idx}" aria-label="Seat ${idx+1}: ${e(name?studentName(name):'Empty')}">${e(name?studentName(name):'Empty')}</button>`;
+ }).join('');
+ return `<div class="hub-seat-free-desk ${p.type==='round'?'hub-seat-round-desk':''} orient-${p.rotation}" data-desk-index="${i}" style="left:${p.x}%;top:${p.y}%">
+  <div class="hub-seat-free-head"><button type="button" class="hub-seat-free-grip" data-desk-handle="${i}" title="Drag desk ${i+1}. Use arrow keys for precise movement." aria-label="Move desk ${i+1}, drag or use arrow keys">⠿ ${p.type==='round'?'Round table':i+1}</button>
+  ${p.type==='round'?'':`<button type="button" class="hub-seat-free-rotate" data-seat-action="rotate-desk" data-desk-index="${i}" aria-label="Rotate desk ${i+1} from ${p.rotation} degrees to ${(p.rotation+90)%360} degrees" title="Rotate desk 90° (currently ${p.rotation}°)">↻</button>`}</div>
+  <div class="hub-seat-pair">${p.type==='round'?`<div class="hub-seat-round-middle">ROUND<br>TABLE</div>`:''}${names}</div>${i>=12?`<button type="button" class="hub-seat-free-remove" data-seat-action="remove-desk" data-desk-index="${i}" aria-label="Remove desk ${i+1}" title="Remove extra desk ${i+1}">×</button>`:''}</div>`;
+}
+function seatFreeBoard(){
+ const d=seatData();return `<div class="hub-seat-free-board" id="hub-seat-free-board" data-desk-size="${d.customDeskSize}" aria-label="Moveable classroom desks, ${d.customDesks.length} tables"><div class="hub-seat-free-front">FRONT · INTERACTIVE WHITEBOARD</div>${d.customDesks.map((_,i)=>seatFreeDesk(i)).join('')}</div>`;
+}
+function seatCustomPreset(source){
+ const d=seatData();
+ if(!confirm('Reset positions for the first 12 desks to the '+(source==='classic'?'original':'three-row')+' layout? Extra desks and student seating will stay.'))return;
+ d.customDesks=[...seatDefaultDeskPositions(source),...d.customDesks.slice(12)];seatSave();render();seatNotice('Base desk positions reset; extra desks retained');
+}
+function seatAddRound(){
+ if(seatData().layout!==HUB_SEAT_LAYOUT_CUSTOM)seatChangeLayout(HUB_SEAT_LAYOUT_CUSTOM);
+ const d=seatData();if(seatRoundIndex(d)!==-1){seatNotice('A four-seat round table is already on the layout');return}
+ d.customDesks.push({x:39,y:78,rotation:0,vertical:false,type:'round'});
+ d.assignments.push(null,null,null,null);d.layouts.custom=d.assignments.slice();hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();seatNotice('Round table added with four seats');
+}
+function seatAddDesk(){
+ if(seatData().layout!==HUB_SEAT_LAYOUT_CUSTOM)seatChangeLayout(HUB_SEAT_LAYOUT_CUSTOM);
+ const d=seatData();
+ const round=seatRoundIndex(d),count=d.customDesks.length-(round>=0?1:0);
+ if(count>=HUB_SEAT_MAX_DESKS){seatNotice('Maximum of 20 rectangular desks in the custom layout');return}
+ const index=round>=0?round:d.customDesks.length;
+ d.customDesks.splice(index,0,seatExtraDeskPosition(count));
+ d.assignments.splice(index*2,0,null,null);
+ d.layouts.custom=d.assignments.slice();
+ hubSelectedSeat=null;hubSelectedUnseated=null;
+ seatSave();render();seatNotice('Desk '+(index+1)+' added with two empty seats');
+}
+function seatRemoveDesk(index){
+ const d=seatData();
+ if(d.layout!==HUB_SEAT_LAYOUT_CUSTOM||!Number.isInteger(index)||index<12||index>=d.customDesks.length)return;
+ const start=seatOffset(d,index),count=d.customDesks[index].type==='round'?4:2;
+ const names=d.assignments.slice(start,start+count).filter(Boolean);
+ if(!confirm('Remove desk '+(index+1)+'?'+(names.length?' '+names.map(studentName).join(' and ')+' will become unseated.':'')))return;
+ d.customDesks.splice(index,1);
+ d.assignments.splice(start,count);
+ d.layouts.custom=d.assignments.slice();
+ hubSelectedSeat=null;hubSelectedUnseated=null;
+ seatSave();render();seatNotice('Desk removed'+(names.length?'; '+names.length+' student(s) unseated':''));
+}
+function seatDeskRotate(i){
+ const d=seatData();if(i<0||i>=d.customDesks.length||d.customDesks[i].type==='round')return;
+ const item=d.customDesks[i];item.rotation=((Number(item.rotation)||0)+90)%360;item.vertical=item.rotation===90||item.rotation===270;
+ render();
+ const board=document.getElementById('hub-seat-free-board'),desk=board?.querySelector(`[data-desk-index="${i}"]`);
+ if(desk)seatDeskPosition(i,item.x,item.y,desk,board);
+ seatSave();
+}
+function seatDeskClamp(i,board,desk,x,y){
+ const d=seatData(),rect=board.getBoundingClientRect(),box=desk.getBoundingClientRect();
+ // Compare displayed rectangles, including browser or TV zoom.
+ const maxX=Math.max(0,100*(rect.width-box.width)/Math.max(1,rect.width));
+ const maxY=Math.max(0,100*(rect.height-box.height)/Math.max(1,rect.height));
+ return {x:Math.max(0,Math.min(maxX,x)),y:Math.max(0,Math.min(maxY,y))};
+}
+function seatDeskPosition(i,x,y,desk,board){
+ const d=seatData();const bounded=seatDeskClamp(i,board,desk,x,y);
+ const step=d.customSnap?2.5:0;
+ const result={x:step?Math.round(bounded.x/step)*step:bounded.x,y:step?Math.round(bounded.y/step)*step:bounded.y};
+ Object.assign(d.customDesks[i],seatDeskClamp(i,board,desk,result.x,result.y));
+ desk.style.left=d.customDesks[i].x+'%';desk.style.top=d.customDesks[i].y+'%';
+}
+function seatDeskPointerStart(ev){
+ const handle=ev.target.closest('[data-desk-handle]');if(!handle||!seatIsOpen()||seatData().layout!==HUB_SEAT_LAYOUT_CUSTOM)return;
+ if(ev.button!==undefined&&ev.button!==0)return;
+ const desk=handle.closest('.hub-seat-free-desk'),board=document.getElementById('hub-seat-free-board');if(!desk||!board)return;
+ const i=Number(handle.dataset.deskHandle),p=seatData().customDesks[i];
+ hubDeskDrag={id:ev.pointerId,handle,desk,board,index:i,startX:ev.clientX,startY:ev.clientY,x:p.x,y:p.y,moved:false};
+ desk.classList.add('dragging');try{handle.setPointerCapture(ev.pointerId)}catch(err){}
+ ev.preventDefault();
+}
+function seatDeskPointerMove(ev){
+ const drag=hubDeskDrag;if(!drag||drag.id!==ev.pointerId)return;
+ const rect=drag.board.getBoundingClientRect();
+ const dx=100*(ev.clientX-drag.startX)/Math.max(1,rect.width),dy=100*(ev.clientY-drag.startY)/Math.max(1,rect.height);
+ if(Math.abs(ev.clientX-drag.startX)+Math.abs(ev.clientY-drag.startY)>3)drag.moved=true;
+ seatDeskPosition(drag.index,drag.x+dx,drag.y+dy,drag.desk,drag.board);
+ ev.preventDefault();
+}
+function seatDeskPointerEnd(ev){
+ const drag=hubDeskDrag;if(!drag||drag.id!==ev.pointerId)return;
+ drag.desk.classList.remove('dragging');try{drag.handle.releasePointerCapture(ev.pointerId)}catch(err){}
+ hubDeskDrag=null;seatSave();
+ ev.preventDefault();
+}
+function seatDeskKeyMove(ev){
+ const handle=ev.target.closest('[data-desk-handle]');if(!handle||!seatIsOpen()||seatData().layout!==HUB_SEAT_LAYOUT_CUSTOM)return;
+ const dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+ const v=dirs[ev.key];if(!v)return;
+ const i=Number(handle.dataset.deskHandle),desk=handle.closest('.hub-seat-free-desk'),board=document.getElementById('hub-seat-free-board');
+ const p=seatData().customDesks[i],n=ev.shiftKey?5:1;
+ seatDeskPosition(i,p.x+v[0]*n,p.y+v[1]*n,desk,board);seatSave();ev.preventDefault();
+}
+function seatData(){
+ if(!ext().year3Seating || !Array.isArray(ext().year3Seating.assignments))ext().year3Seating=seatInitial(true);
+ const d=ext().year3Seating;
+ d.students=S.students.map(st=>st.id);
+ if(![HUB_SEAT_LAYOUT_ORIGINAL,HUB_SEAT_LAYOUT_TALL,HUB_SEAT_LAYOUT_CUSTOM].includes(d.layout))d.layout=HUB_SEAT_LAYOUT_ORIGINAL;
+ if(!Array.isArray(d.customDesks))d.customDesks=seatDefaultDeskPositions('tall3');
+ const cleanDesks=seatValidateDeskPositions(d.customDesks);
+ d.customDesks.length=cleanDesks.length;
+ for(let i=0;i<cleanDesks.length;i++){
+  if(!d.customDesks[i]||typeof d.customDesks[i]!=='object')d.customDesks[i]=cleanDesks[i];
+  else Object.assign(d.customDesks[i],cleanDesks[i]);
+ }
+ const capacity=seatCapacity(d);
+ if(d.assignments.length!==capacity)d.assignments=Array.from({length:capacity},(_,i)=>d.assignments[i]??null);
+ if(typeof d.customSnap!=='boolean')d.customSnap=false;
+ if(!['tiny','compact','regular'].includes(d.customDeskSize))d.customDeskSize='compact';
+ if(typeof d.preferMixedPairs!=='boolean')d.preferMixedPairs=false;
+ if(!d.pairCategories||typeof d.pairCategories!=='object'||Array.isArray(d.pairCategories))d.pairCategories={};
+ // Accept explicit teacher selections only, and remove invalid imported values.
+ for(const n of Object.keys(d.pairCategories))if(!d.students.includes(n)||!HUB_PAIR_VALUES.has(d.pairCategories[n]))delete d.pairCategories[n];
+ if(!d.layouts||typeof d.layouts!=='object'||Array.isArray(d.layouts))d.layouts={};
+ // Older Hub versions store one seating array; retain it in the original layout.
+ if(!Array.isArray(d.layouts[d.layout]))d.layouts[d.layout]=d.assignments.slice();
+ const valid=new Set(d.students);const used=new Set();d.assignments=d.assignments.map(id=>{if(!valid.has(id)||used.has(id))return null;used.add(id);return id});
+ return d;
+}
+function seatKeepCurrentLayout(){
+ const d=seatData();d.layouts[d.layout]=d.assignments.slice();return d;
+}
+function seatCleanLayouts(){
+ const d=seatData();const valid=new Set(d.students);
+ for(const [layout,arr] of Object.entries(d.layouts)){
+  if(![HUB_SEAT_LAYOUT_ORIGINAL,HUB_SEAT_LAYOUT_TALL,HUB_SEAT_LAYOUT_CUSTOM].includes(layout)){delete d.layouts[layout];continue}
+  const used=new Set();const capacity=layout===HUB_SEAT_LAYOUT_CUSTOM?seatCustomCapacity(d.customDesks):HUB_SEAT_COUNT;
+  d.layouts[layout]=Array.from({length:capacity},(_,i)=>{
+   const x=Array.isArray(arr)?arr[i]:null;
+   if(typeof x!=='string'||!valid.has(x)||used.has(x))return null;
+   used.add(x);return x;
+  });
+ }
+ d.assignments=d.layouts[d.layout].slice();
+}
+function seatChangeLayout(layout){
+ if(![HUB_SEAT_LAYOUT_ORIGINAL,HUB_SEAT_LAYOUT_TALL,HUB_SEAT_LAYOUT_CUSTOM].includes(layout))return;
+ const d=seatKeepCurrentLayout();
+ if(layout===d.layout)return;
+ // First use begins with the current students, then saves arrangements separately.
+ if(!Array.isArray(d.layouts[layout]))d.layouts[layout]=d.assignments.slice();
+ d.layout=layout;
+ const capacity=seatCapacity(d);
+ d.assignments=Array.from({length:capacity},(_,i)=>d.layouts[layout][i]??null);
+ hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();
+}
+function seatValidate(students,assignments,capacity=HUB_SEAT_COUNT){
+ if(!Array.isArray(students)||!Array.isArray(assignments)||students.length>120||assignments.length>120)throw Error('Invalid class list or seating file');
+ const names=[...new Set(students.map(x=>String(x).trim()).filter(Boolean))].slice(0,120);
+ const used=new Set();const seats=Array.from({length:capacity},(_,i)=>{
+  const name=assignments[i];if(name===null||name===undefined||name==='')return null;
+  if(typeof name!=='string'||!names.includes(name)||used.has(name))return null;
+  used.add(name);return name;
+ });
+ return {students:names,assignments:seats};
+}
+function seatTable(row,num,off){
+ const as=seatData().assignments;let pair=[off,off+1].map(i=>{
+  const name=as[i];const selected=hubSelectedSeat===i;
+  return `<button type="button" class="hub-seat-person ${name===null?'is-empty':''} ${selected?'is-selected':''} ${hubSelectedUnseated?'is-target':''}" data-seat-action="seat" data-seat-index="${i}" aria-label="Seat ${i+1}: ${e(name?studentName(name):'Empty')}">${e(name?studentName(name):'Empty')}</button>`
+ }).join('');
+ return `<div class="hub-seat-desk"><div class="hub-seat-desk-label">ROW ${row} · TABLE ${num}</div><div class="hub-seat-pair">${pair}</div></div>`;
+}
+function seatingView(){
+ const d=seatData();let off=0,rows='';
+ const isTall=d.layout===HUB_SEAT_LAYOUT_TALL;
+ const isCustom=d.layout===HUB_SEAT_LAYOUT_CUSTOM;
+ if(isCustom){
+  rows=seatFreeBoard();
+ }else if(isTall){
+  // Visual order is front to back. All twelve tables have two vertically stacked seats.
+  for(const [row,label] of [[1,'FRONT ROW'],[2,'MIDDLE ROW'],[3,'BACK ROW']]){
+   rows+=`<div class="hub-seat-row-caption">${label} · 4 tall tables · 8 seats</div>`;
+   const tables=[];
+   for(let num=1;num<=4;num++){
+    tables.push(seatTable(row,num,off).replace('class="hub-seat-desk"','class="hub-seat-desk hub-seat-tall-table"'));off+=2;
+   }
+   rows+=row<3
+     ?`<div class="hub-seat-desk-row hub-seat-tall-row has-aisle">${tables[0]}${tables[1]}<div class="hub-seat-aisle" aria-label="Centre aisle">AISLE</div>${tables[2]}${tables[3]}</div>`
+     :`<div class="hub-seat-desk-row hub-seat-tall-row">${tables.join('')}</div>`;
+  }
+ }else{
+  const r1=seatTable(1,1,off);off+=2;
+  rows=`<div class="hub-seat-desk-row">${r1}<div class="hub-seat-floor">Floor space in front of screen</div><div class="hub-seat-teacher">Teacher table</div></div>`;
+  for(const r of [2,3]){
+   const t1=seatTable(r,1,off);off+=2;
+   const t2=seatTable(r,2,off);off+=2;
+   const t3=seatTable(r,3,off);off+=2;
+   const t4=seatTable(r,4,off);off+=2;
+   rows+=`<div class="hub-seat-desk-row">${t1}<div class="hub-seat-joined">${t2}${t3}</div>${t4}</div>`;
+  }
+  rows+='<div class="hub-seat-desk-row"><div aria-hidden="true"></div>';
+  for(const n of [2,3,4]){rows+=seatTable(4,n,off);off+=2}
+  rows+='</div>';
+ }
+ const unused=d.students.filter(n=>!d.assignments.includes(n));
+ const seated=d.assignments.filter(Boolean).length;
+ const layoutName=isCustom?'Custom moveable desks':isTall?'Three rows - tall tables':'Original four-row layout';
+ const help=isCustom?'Add two-seat desks or one four-seat round table. Drag the blue handle to move it, tap ↻ to rotate it, or × to remove an extra desk. Change desk size above, and tap any two seats to swap students.':isTall?'Three rows of four tall tables. The front and middle rows have a centre aisle between tables 2 and 3. The back row has four tables. Each table holds two students.':'Tables 2 and 3 touch in rows 2 and 3. Row 4 uses columns 2, 3 and 4. Each table has two seats.';
+ return `<div class="hub-seating"><div id="seatNotice" class="notice" hidden role="status"></div>
+ <div class="hub-seat-top"><div><h2 style="margin:0 0 5px">Classroom Seating Planner</h2><p class="muted small" style="margin:0">Select two seats to swap students, or choose an unseated student and tap a seat.</p></div>
+  <div class="hub-seat-toolbar"><button type="button" class="btn" data-seat-action="add-desk">＋ Add desk</button><button type="button" class="btn secondary" data-seat-action="add-round">◯ Add round table (4 seats)</button><button type="button" class="btn" data-seat-action="random">🎲 Randomise</button><button type="button" class="btn secondary" data-seat-action="clear">Clear seats</button><button type="button" class="btn secondary" data-seat-action="download">⬇ Save seating plan</button><button type="button" class="btn secondary" data-seat-action="print">🖨 Print</button><button type="button" class="btn secondary" data-seat-action="import">⬆ Import seating plan</button><button type="button" class="btn secondary" data-seat-action="reset">↺ Reset</button></div></div>
+ <div class="hub-seat-layout-choice"><label for="hub-seat-layout">Classroom layout</label><select id="hub-seat-layout" aria-label="Choose classroom layout"><option value="classic" ${d.layout==='classic'?'selected':''}>Original layout - 4 rows</option><option value="tall3" ${isTall?'selected':''}>Three rows of tall tables</option><option value="custom" ${isCustom?'selected':''}>Custom layout - move desks freely</option></select><span class="hub-seat-layout-note">All three layouts remember their own seating. Your class list is shared.</span></div>
+ ${isCustom?`<div class="hub-seat-custom-tools"><strong>${d.customDesks.filter(p=>p.type!=='round').length} desks${seatRoundIndex(d)>=0?' + 1 round table':''} / ${seatCapacity(d)} seats</strong><span class="small">Drag ⠿ to move; ↻ rotates. Remove an extra desk with ×. Up to ${HUB_SEAT_MAX_DESKS} desks.</span><label class="hub-seat-size-label" for="hub-seat-size">Desk size <select id="hub-seat-size" class="hub-seat-size-select" aria-label="Choose desk size"><option value="tiny" ${d.customDeskSize==='tiny'?'selected':''}>Extra compact</option><option value="compact" ${d.customDeskSize==='compact'?'selected':''}>Compact</option><option value="regular" ${d.customDeskSize==='regular'?'selected':''}>Standard</option></select></label><label class="hub-seat-snap"><input type="checkbox" id="hub-seat-snap" ${d.customSnap?'checked':''}> Snap to grid</label><button type="button" class="btn secondary sm" data-seat-action="custom-tall">Reset to 3 rows</button><button type="button" class="btn secondary sm" data-seat-action="custom-classic">Reset to 4 rows</button></div>`:''}
+ <div class="hub-seat-columns">
+ <section class="hub-seat-board" id="hub-seat-board" aria-label="${e(layoutName)} classroom seating chart"><div class="hub-seat-print-head"><h2>${e(S.className||'Classroom')} Seating Plan</h2><p>${e(layoutName)} · ${seated} students seated</p></div><div class="hub-seat-heading">${isCustom?"CUSTOM ROOM LAYOUT":"FRONT | Whiteboard / Teaching Wall"}</div><div class="${isCustom?"hub-seat-free-wrap":"hub-seat-row-stack"}">${rows}</div><p class="hub-seat-help">${help}</p></section>
+ <aside class="hub-seat-side"><h3>Class list</h3><p>Shared with Info & Settings. Manage names in your class list.</p>
+ <textarea readonly id="hub-seat-names" aria-label="Class list, one student per line">${e(d.students.map(studentName).join('\n'))}</textarea>
+ <div class="hub-seat-smallactions"><button type="button" class="btn" data-seat-action="apply">Manage class list</button><button type="button" class="btn secondary" data-seat-action="cancel">Clear selection</button></div>
+ <section class="hub-seat-pairing ${d.preferMixedPairs?'hub-seat-pair-enabled':''}">
+  <h3>Boy / Girl Pairing</h3>
+  <label class="hub-seat-pair-toggle"><input type="checkbox" id="hub-seat-pair-toggle" ${d.preferMixedPairs?'checked':''}> Try to seat one boy and one girl per table</label>
+  <p class="hub-seat-pair-note">Choose the group for each student below. Nothing is guessed from names. Students marked Not set are seated normally.</p>
+  <div class="hub-seat-pair-list" aria-label="Student pairing categories">
+   ${d.students.map(n=>`<label class="hub-seat-pair-row"><span class="student">${e(studentName(n))}</span><select data-seat-category="${e(n)}" aria-label="Pairing group for ${e(studentName(n))}"><option value="" ${!d.pairCategories[n]?'selected':''}>Not set</option><option value="boy" ${d.pairCategories[n]==='boy'?'selected':''}>Boy</option><option value="girl" ${d.pairCategories[n]==='girl'?'selected':''}>Girl</option></select></label>`).join('')}
+  </div>
+  <div class="hub-seat-pair-stats">${d.students.filter(n=>d.pairCategories[n]==='boy').length} boys · ${d.students.filter(n=>d.pairCategories[n]==='girl').length} girls · ${d.students.filter(n=>!d.pairCategories[n]).length} not set${seated?' · '+seatMixedCount(d)+' mixed pairs currently':''}</div>
+  <p class="hub-seat-pair-note">Only applies when you press Randomise. Manual changes and all three desk layouts remain available. Keep student information and backups private.</p>
+ </section>
+ <p class="hub-seat-count">${seated} / ${d.students.length} students seated</p><h3>Unseated students (${unused.length})</h3>
+ <p>Tap a name below, then tap a seat to place that student.</p>
+ <div class="hub-seat-unseated-list">${unused.length?unused.map(n=>`<button type="button" class="hub-seat-unseated ${hubSelectedUnseated===n?'is-selected':''}" data-seat-action="unseated" data-seat-name="${e(n)}">${e(studentName(n))}</button>`).join(''):'<span class="small muted">Everyone has a seat.</span>'}</div>
+ <p class="small muted">Seat changes and all three layout arrangements are saved with the Hub backup.</p></aside>
+ </div><input type="file" id="hub-seat-file" accept=".json,application/json" style="display:none"></div>`;
+}
+function seatAction(action,el){
+ const d=seatData();
+ if(action==='add-desk'){seatAddDesk();return}
+ if(action==='add-round'){seatAddRound();return}
+ if(action==='remove-desk'){seatRemoveDesk(Number(el.dataset.deskIndex));return}
+ if(action==='rotate-desk'){seatDeskRotate(Number(el.dataset.deskIndex));return}
+ if(action==='custom-tall'||action==='custom-classic'){seatCustomPreset(action==='custom-tall'?'tall3':'classic');return}
+ if(action==='seat'){
+  const n=Number(el.dataset.seatIndex);if(!Number.isInteger(n)||n<0||n>=seatCapacity(d))return;
+  if(hubSelectedUnseated){d.assignments[n]=hubSelectedUnseated;hubSelectedUnseated=null;hubSelectedSeat=null;seatSave();render();return}
+  if(hubSelectedSeat===null){hubSelectedSeat=n;render();return}
+  if(hubSelectedSeat===n){hubSelectedSeat=null;render();return}
+  [d.assignments[hubSelectedSeat],d.assignments[n]]=[d.assignments[n],d.assignments[hubSelectedSeat]];
+  hubSelectedSeat=null;seatSave();render();return;
+ }
+ if(action==='unseated'){
+  const n=el.dataset.seatName;
+  hubSelectedUnseated=hubSelectedUnseated===n?null:n;
+  hubSelectedSeat=null;render();return;
+ }
+ if(action==='cancel'){hubSelectedSeat=null;hubSelectedUnseated=null;render();return}
+ if(action==='apply'){settings='Class list';go('Info & Settings');return;}
+ if(action==='random'){
+  const capacity=seatCapacity(d);
+  const list=d.preferMixedPairs?seatMixedRandomOrder(d):seatShuffle(d.students).slice(0,capacity);
+  d.assignments=Array.from({length:capacity},(_,i)=>list[i]||null);
+  hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();
+  seatNotice(d.preferMixedPairs?'Mixed pairs: '+seatMixedCount(d)+' of '+seatDeskCount(d)+' desks':'Seating randomised');return;
+ }
+ if(action==='clear'){
+  if(!confirm('Clear all assigned seats? Class names will remain.'))return;
+  d.assignments=Array(seatCapacity(d)).fill(null);hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();return;
+ }
+ if(action==='reset'){
+ if(!confirm('Reset all desk positions and clear all seating arrangements? Your class list will remain unchanged.'))return;
+ ext().year3Seating=seatInitial(false);hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();return;
+ }
+ if(action==='print'){window.print();return}
+ if(action==='download'){
+  seatKeepCurrentLayout();
+  const blob=new Blob([JSON.stringify({students:d.students,studentNames:Object.fromEntries(d.students.map(id=>[id,studentName(id)])),assignments:d.assignments,layout:d.layout,layouts:d.layouts,customDesks:d.customDesks,customSnap:d.customSnap,customDeskSize:d.customDeskSize,preferMixedPairs:d.preferMixedPairs,pairCategories:d.pairCategories},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='classroom-seating-backup.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);seatNotice('Seating file downloaded');return;
+ }
+ if(action==='import'){document.getElementById('hub-seat-file')?.click();return}
+}
+
+document.addEventListener('pointerdown',seatDeskPointerStart,true);
+document.addEventListener('pointermove',seatDeskPointerMove,true);
+document.addEventListener('pointerup',seatDeskPointerEnd,true);
+document.addEventListener('pointercancel',seatDeskPointerEnd,true);
+document.addEventListener('keydown',seatDeskKeyMove,true);
+document.addEventListener('change',ev=>{
+ if(ev.target.id==='hub-seat-snap'){seatData().customSnap=ev.target.checked;seatSave();}
+ if(ev.target.id==='hub-seat-size'){
+  const d=seatData();if(!['tiny','compact','regular'].includes(ev.target.value))return;
+  d.customDeskSize=ev.target.value;render();
+  const board=document.getElementById('hub-seat-free-board');
+  if(board)for(let i=0;i<d.customDesks.length;i++){const desk=board.querySelector(`[data-desk-index="${i}"]`);if(desk)seatDeskPosition(i,d.customDesks[i].x,d.customDesks[i].y,desk,board)}
+  seatSave();
+ }
+},true);
+document.addEventListener('click',ev=>{
+ const b=ev.target.closest('[data-seat-action]');if(!b)return;
+ ev.preventDefault();ev.stopImmediatePropagation();seatAction(b.dataset.seatAction,b);
+},true);
+document.addEventListener('change',ev=>{
+ if(ev.target.id==='hub-seat-layout')seatChangeLayout(ev.target.value);
+ if(ev.target.id==='hub-seat-pair-toggle'){
+  seatData().preferMixedPairs=ev.target.checked;seatSave();render();
+ }
+ if(ev.target.hasAttribute('data-seat-category')){
+  const d=seatData(),name=ev.target.dataset.seatCategory,value=ev.target.value;
+  if(!d.students.includes(name)||!HUB_PAIR_VALUES.has(value))return;
+  if(value)d.pairCategories[name]=value;else delete d.pairCategories[name];
+  seatSave();render();
+ }
+},true);
+
+document.addEventListener('change',async ev=>{if(ev.target.id!=='hub-seat-file')return;const f=ev.target.files?.[0];if(!f)return;const account=window.hubAccount,workspace=S;try{if(f.size>1000000)throw Error('Seating file too large');const raw=JSON.parse(await f.text());if(S!==workspace||window.hubAccount!==account)return;const source=raw.state?.seating||raw;if(!Array.isArray(source.students)||!Array.isArray(source.assignments))throw Error('Not a seating plan');const ids=S.students.map(st=>st.id);const map=x=>{if(ids.includes(x))return x;const matches=S.students.filter(st=>st.name===(source.studentNames?.[x]||x));return matches.length===1?matches[0].id:null};const desks=seatValidateDeskPositions(source.customDesks);const layout=['classic','tall3','custom'].includes(source.layout)?source.layout:'classic';const cap=l=>l==='custom'?seatCustomCapacity(desks):24;const convert=(arr,l)=>seatValidate(ids,arr.map(map),cap(l)).assignments;const layouts={};for(const l of ['classic','tall3','custom'])if(Array.isArray(source.layouts?.[l]))layouts[l]=convert(source.layouts[l],l);layouts[layout]=convert(source.assignments,layout);if(!confirm('Import seating positions and matched student names? Your central class list will not change. Unmatched students will be left unseated.'))return;ext().year3Seating={students:ids,assignments:layouts[layout].slice(),layout,layouts,customDesks:desks,customSnap:source.customSnap===true,customDeskSize:['tiny','compact','regular'].includes(source.customDeskSize)?source.customDeskSize:'compact',preferMixedPairs:source.preferMixedPairs===true,pairCategories:Object.fromEntries(Object.entries(source.pairCategories||{}).map(([id,v])=>[map(id),v]).filter(([id,v])=>id&&HUB_PAIR_VALUES.has(v)))};hubSelectedSeat=null;hubSelectedUnseated=null;seatSave();render();seatNotice('Seating plan imported')}catch(err){seatNotice('Import failed: '+err.message)}finally{ev.target.value=''}},true);
+seatPlanner=seatingView;
+/* V9.5 weekly planner: per-date overrides, stable timetable IDs, and reporting navigation. */
+const plannerOldDaily=daily, plannerOldModule=modulePage, plannerOldRender=render, plannerOldGo=go;
+let plannerMonday=plMonday(new Date()),plannerMode='week',plEdit=null,plExpanded=true;
+function plMonday(d){d=new Date(d);d.setHours(12,0,0,0);d.setDate(d.getDate()-(d.getDay()+6)%7);return dateISO(d)}
+function plDate(i){let d=dateObj(plannerMonday);d.setDate(d.getDate()+i);return dateISO(d)}
+function plStore(){return ext().planner??={dates:{},colours:{},labels:[]}}
+function plDay(ds){return plStore().dates[ds]||{changes:{},extra:[]}}
+function plRows(ds){let p=plDay(ds),d=dayName(dateObj(ds));return [...lessons(d).filter(l=>!p.changes?.[l.id]?.deleted).map(l=>({...l,...p.changes?.[l.id],recurring:true})),...(p.extra||[]).map(l=>({...l,recurring:false}))].sort((a,b)=>String(a.start).localeCompare(String(b.start)))}
+function plMutable(ds){let p=plStore();return p.dates[ds]??={changes:{},extra:[]}}
+function plColour(subject){let custom=plStore().colours[subject];if(/^#[0-9a-f]{6}$/i.test(custom||''))return custom;let defaults={'Morning Circle':'#008589','Spelling':'#ffd66b','Literacy':'#f5ec73','Recess':'#45484b','Lunch':'#45484b','Library':'#438044','Music':'#b8b9bc','English':'#e8a9c0','Maths':'#438bc2','HASS':'#9253a6','Science':'#a7b4a6','The Arts':'#b59bd3','Technologies':'#f28b86','Health & PE':'#ca86a8','Languages':'#adb2ba'};return defaults[subject]||'#c4b69e'}
+function plInk(c){let v=c.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*v[0]+.7152*v[1]+.0722*v[2]>.179?'#17231d':'#fff'}
+function plTime(t){if(!/^\d\d:\d\d$/.test(t||''))return '';let [h,m]=t.split(':').map(Number);return `${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`}
+function plShift(n){let d=dateObj(plannerMonday);d.setDate(d.getDate()+7*n);plannerMonday=dateISO(d);render()}
+function plSetDate(v){if(v&&!isNaN(dateObj(v)))plannerMonday=plMonday(dateObj(v));render()}
+function plOpen(ds,id='',repeat=false){let existing=plRows(ds).find(x=>x.id===id);plEdit={ds,id,repeat,existing:!!existing};let l=existing||{subject:'Maths',name:'',start:'09:00',end:'09:40',focus:'',notes:''};let options=[...new Set([...subjects,'Morning Circle','Spelling','Literacy','Recess','Lunch','Library','Music','Other',...plStore().labels,l.subject])];let dialog=document.createElement('dialog');dialog.id='plDialog';dialog.className='pl-dialog';dialog.innerHTML=`<form id="plForm"><div class="row between"><h2>${existing?'Edit lesson':'Add lesson'}</h2><button type="button" onclick="plClose()">Close ✕</button></div><p class="muted">${e(fmt(ds))}</p><label class="field">Subject<select id="plSubject">${options.map(s=>`<option ${s===l.subject?'selected':''}>${e(s)}</option>`).join('')}</select></label><label class="field">Lesson label (optional)<input id="plLabel" value="${e(l.name)}"></label><div class="pl-times"><label class="field">Start<input id="plStart" type="time" required value="${e(l.start)}"></label><label class="field">End<input id="plEnd" type="time" required value="${e(l.end)}"></label><label class="field">Subject colour<input id="plColour" type="color" value="${plColour(l.subject)}"></label></div><label class="field">Lesson focus<input id="plFocus" value="${e(l.focus)}" placeholder="e.g. Fractions of quantities"></label><label class="field">Teaching notes<textarea id="plNotes" rows="8" placeholder="Learning intention, teaching steps, activities, resources…">${e(l.notes??plLegacyNote(ds,l))}</textarea></label><label class="field">Apply timetable changes<select id="plRepeat"><option value="date">This date only</option>${!existing||l.recurring?`<option value="weekly" ${repeat?'selected':''}>Every ${e(dayName(dateObj(ds)))}</option>`:''}</select></label><small class="muted">Focus and teaching notes are saved for this date only. Weekly changes update the recurring timetable.</small><div class="row between section"><button type="submit" class="primary">Save lesson</button>${existing?'<button type="button" onclick="plDelete()">Delete lesson</button>':''}</div></form>`;document.body.append(dialog);dialog.querySelector('#plSubject').onchange=()=>dialog.querySelector('#plColour').value=plColour(dialog.querySelector('#plSubject').value);dialog.querySelector('form').onsubmit=ev=>{ev.preventDefault();plCommit()};dialog.addEventListener('close',()=>dialog.remove());dialog.showModal()}
+function plLegacyNote(ds,l){let w=ext().weekly||{},key=dayName(dateObj(ds))+'-'+l.id;return w[plMonday(dateObj(ds))]?.[key]??w[ds]?.[key]??''}
+function plClose(){document.getElementById('plDialog')?.close();plEdit=null}
+function plCommit(){if(!plEdit)return;let {ds,id}=plEdit;let val=k=>document.getElementById(k).value;let l={id:id||uid(),subject:val('plSubject'),name:val('plLabel'),start:val('plStart'),end:val('plEnd'),focus:val('plFocus'),notes:val('plNotes')};if(l.start>=l.end){alert('End time must be after start time.');return}let p=plMutable(ds),weekly=val('plRepeat')==='weekly',original=S.timetable.find(x=>x.id===id);plStore().colours[l.subject]=val('plColour');if(weekly){let base={id:l.id,day:dayName(dateObj(ds)),subject:l.subject,name:l.name,start:l.start,end:l.end};if(original)Object.assign(original,base);else S.timetable.push(base);p.changes[l.id]={focus:l.focus,notes:l.notes};p.extra=p.extra.filter(x=>x.id!==l.id)}else if(original){p.changes[l.id]={...l,deleted:false}}else{let i=p.extra.findIndex(x=>x.id===l.id);if(i<0)p.extra.push(l);else p.extra[i]=l}plClose();save();render()}
+function plDelete(){if(!plEdit||!confirm('Remove this lesson?'))return;let {ds,id}=plEdit,p=plMutable(ds);if(document.getElementById('plRepeat').value==='weekly'){S.timetable=S.timetable.filter(x=>x.id!==id);delete p.changes[id]}else if(S.timetable.some(x=>x.id===id))p.changes[id]={deleted:true};else p.extra=p.extra.filter(x=>x.id!==id);plClose();save();render()}
+function plAddSubject(){let n=prompt('New planner subject or activity');if(!n?.trim())return;n=n.trim();if(!plStore().labels.includes(n))plStore().labels.push(n);save();render()}
+function plCopyWeek(){let d=dateObj(plannerMonday);d.setDate(d.getDate()-7);let prev=dateISO(d);if(!confirm('Copy lesson notes from the previous week? Existing notes this week are kept.'))return;for(let i=0;i<5;i++){let a=dateObj(prev);a.setDate(a.getDate()+i);let ds=plDate(i),p=plMutable(ds);for(let l of plRows(dateISO(a))){if(l.recurring&&plRows(ds).some(x=>x.id===l.id)){let old=p.changes[l.id]||{};p.changes[l.id]={...old,focus:old.focus??l.focus??'',notes:old.notes??l.notes??plLegacyNote(dateISO(a),l)}}}}save();render()}
+function plCard(l,ds){let c=plColour(l.subject),n=l.notes??plLegacyNote(ds,l);return `<article class="pl-lesson" style="--lesson-colour:${c}"><button class="pl-lesson-head" style="background:${c};color:${plInk(c)}" onclick="plOpen(${J(ds)},${J(l.id)})"><span><strong>${e(l.name||l.subject)}</strong><small>${plTime(l.start)}–${plTime(l.end)}</small></span><span aria-label="Edit lesson">⋯</span></button>${l.focus?`<div class="pl-focus" onclick="plOpen(${J(ds)},${J(l.id)})">${e(l.focus)}</div>`:''}${plExpanded&&n?`<div class="pl-notes" onclick="plOpen(${J(ds)},${J(l.id)})">${e(n)}</div>`:''}</article>`}
+function plannerPage(){if(plannerMode==='template')return title('Planner')+`<div class="pl-toolbar">${btn('← Weekly planner',"plannerMode='week';render()")}</div>`+plannerOldDaily().replace(/<div class="section"><h1>[^<]*<\/h1>[\s\S]*?<\/div>/,'');let end=plDate(4),now=dateISO(new Date());return `<section class="pl-page"><div class="pl-heading"><div><h1>Planner</h1><p class="muted">Weekly lessons and teaching notes</p></div><div class="row">${btn('Recurring timetable',"plannerMode='template';render()")}${btn('Print week','window.print()')}</div></div><div class="pl-toolbar"><div class="row">${btn('‹','plShift(-1)')}${btn('Today',"plannerMonday=plMonday(new Date());render()")}${btn('›','plShift(1)')}<strong>${e(dateObj(plannerMonday).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))} – ${e(dateObj(end).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}))}</strong><input aria-label="Jump to week" type="date" value="${plannerMonday}" onchange="plSetDate(this.value)"></div><div class="row">${btn(plExpanded?'Hide notes':'Show notes','plExpanded=!plExpanded;render()')}${btn('Copy last week','plCopyWeek()')}${btn('＋ Subject','plAddSubject()')}</div></div><div class="pl-scroll"><div class="pl-week">${days.map((d,i)=>{let ds=plDate(i),info=schoolDay(dateObj(ds)),events=[...S.events,...S.fun].filter(x=>x.date===ds);return `<section class="pl-day"><header class="pl-day-head ${ds===now?'today':''}"><span>${d.slice(0,3)}</span><strong>${e(dateObj(ds).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))}</strong><button aria-label="Add lesson" onclick="plOpen(${J(ds)})">＋</button></header><div class="pl-day-body">${info.kind!=='School day'?`<div class="pl-event">${e(info.kind)}</div>`:''}${events.map(x=>`<div class="pl-event">${e(x.name)}</div>`).join('')}${plRows(ds).map(l=>plCard(l,ds)).join('')}<button class="pl-add" onclick="plOpen(${J(ds)})">＋ Add lesson</button><button class="pl-add pl-repeat" onclick="plOpen(${J(ds)},'',true)">＋ Recurring lesson</button></div></section>`}).join('')}</div></div></section>`}
+// Preserve existing timetable IDs and records; date-specific changes also feed today's dashboard.
+const plBaseDashboard=dashboard,plBaseLessons=lessons;
+dashboard=function(){let ds=preview||dateISO(new Date());let rows=plRows(ds);lessons=function(day){return day===dayName(dateObj(ds))?rows:plBaseLessons(day)};try{return plBaseDashboard()}finally{lessons=plBaseLessons}};
+daily=plannerPage;weeklyPlanner=plannerPage;
+moduleTabs['Reporting Centre']=['Grades',...moduleTabs['Reporting Centre'].filter(x=>x!=='Grades')];
+modulePage=function(){if(page==='Reporting Centre'&&(moduleTab[page]||'Grades')==='Grades')return title('Reporting Centre')+tabs(moduleTabs[page],'Grades','pickModule')+grades().replace(/<div class="section"><h1>Grades<\/h1>[\s\S]*?<\/div>/,'');return plannerOldModule()};
+go=function(p){if(p==='Grades'){moduleTab['Reporting Centre']='Grades';p='Reporting Centre'}return plannerOldGo(p)};
+render=function(){plannerOldRender();let nav=$('nav');for(let b of nav.querySelectorAll('button')){let t=b.textContent.trim();if(t==='Daily Classroom'){let span=b.querySelector('span');if(span)span.textContent='Planner';else b.textContent='Planner'}if(t==='Grades'&&b.closest('#nav'))b.remove();if(t==='Reporting Centre'&&b.closest('.navmenu')){b.remove()}}let report=document.createElement('button');report.className=page==='Reporting Centre'?'active':'';report.innerHTML=designIcon('Reporting Centre')+'<span>Reporting</span>';report.onclick=()=>go('Reporting Centre');let menu=nav.querySelector('.navmore');nav.insertBefore(report,menu||nav.lastElementChild);if(page==='Daily Classroom')$('crumb').textContent='Planner';if(page==='Dashboard'){document.querySelectorAll('.quicklinks button').forEach(b=>{let t=b.textContent.trim();if(t==='Daily Classroom')b.querySelector('span').textContent='Planner';if(t==='Grades'){b.querySelector('span').textContent='Reporting';b.onclick=()=>go('Grades');b.removeAttribute('onclick');b.onclick=()=>go('Grades')}})} };
 </script><script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
 import {getAuth,setPersistence,browserSessionPersistence,onAuthStateChanged,signInWithEmailAndPassword,GoogleAuthProvider,signInWithPopup,sendPasswordResetEmail,signOut,createUserWithEmailAndPassword,sendEmailVerification,updateProfile,reload,getIdToken} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
