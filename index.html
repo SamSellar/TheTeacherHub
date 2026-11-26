@@ -2533,6 +2533,20 @@ body.hub3 .pl-lesson:is(:hover,:focus-within) .st-drag-grip{opacity:1}
 @keyframes pulse{50%{opacity:.35}}
 @media(prefers-reduced-motion:reduce){#savePill i{animation:none!important}}
 body.hub3 .atlas-bar #a2Save{display:none}
+
+/* ---------- dashboard header: greeting, one calm date line, quiet actions ---------- */
+body.hub3.cloudReady:not(.board) #app .hero{display:flex!important;align-items:flex-end!important;justify-content:space-between;gap:20px;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:6px 2px 18px!important;margin-bottom:6px}
+body.hub3.cloudReady:not(.board) #app .hero>div:first-child{min-width:0}
+body.hub3.cloudReady:not(.board) #app .hero .eyebrow{font-size:13px;margin:0 0 2px;color:var(--muted)}
+body.hub3.cloudReady:not(.board) #app .hero h1{font-size:clamp(28px,3.2vw,40px);line-height:1.1;margin:0 0 6px;letter-spacing:-.025em}
+body.hub3.cloudReady:not(.board) #app .hero h2{display:block!important;font-size:15px;font-weight:500;color:var(--muted);margin:0}
+body.hub3.cloudReady:not(.board) #app .hero h2 a{color:var(--accent);font-weight:650;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+body.hub3.cloudReady:not(.board) #app .hero .hero-date,body.hub3.cloudReady:not(.board) #app .hero .pill{display:none!important}
+body.hub3.cloudReady:not(.board) #app .hero .row.hideboard{flex-direction:row!important;align-items:center;gap:8px!important;flex:0 0 auto}
+body.hub3.cloudReady:not(.board) #app .hero .row.hideboard button{min-height:36px;padding:7px 14px;border-radius:99px;font-size:13px;font-weight:600}
+body.hub3.cloudReady:not(.board) #app .hero .row.hideboard button:first-child{background:transparent;border-color:transparent;color:var(--muted)}
+body.hub3.cloudReady:not(.board) #app .hero .row.hideboard button:first-child:hover{background:var(--soft);color:var(--ink)}
+@media(max-width:700px){body.hub3.cloudReady:not(.board) #app .hero{flex-direction:column;align-items:flex-start}}
 `;document.head.appendChild(css);
 
 /* ---------- sidebar mode ---------- */
@@ -2556,7 +2570,13 @@ save=function(){state='saving';drawPill();const r=_save.apply(this,arguments);cl
 function watchCloud(){const s=el('saveStatus');if(!s||s.dataset.watched)return;s.dataset.watched=1;new MutationObserver(()=>{const t=s.textContent.trim();lastText=t;
   if(/error|fail|offline|not saved|conflict|blocked/i.test(t))state='error';else if(/saving|queued|pending|syncing/i.test(t))state='saving';else if(/saved|synced|cloud/i.test(t)){state='saved';last=new Date()}drawPill()}).observe(s,{childList:true,characterData:true,subtree:true})}
 addEventListener('beforeunload',ev=>{if(state==='saving'&&window.hubAccount){ev.preventDefault();ev.returnValue=''}});
-const _r=render;render=function(){_r();applyMode();paintCollapse();watchCloud();ensurePill()};
+
+/* ---------- dashboard header content ---------- */
+function tidyHero(){if(document.body.classList.contains('board'))return;const h=document.querySelector('#app .hero');if(!h||h.dataset.tidy)return;const h1=h.querySelector('h1'),h2=h.querySelector('h2'),pill=h.querySelector('.pill');if(!h1||!h2)return;h.dataset.tidy=1;
+ const d=new Date(),hr=d.getHours(),g=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';h1.textContent=h1.textContent.replace(/^Good (morning|afternoon|evening)/,g);
+ const day=d.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});const t=pill?pill.textContent.trim():'';
+ if(/not configured/i.test(t))h2.innerHTML=e(day)+' · <a href="#" onclick="event.preventDefault();stView=\'\';settings=\'School calendar\';go(\'Info & Settings\')">Add term dates</a>';else h2.textContent=day+(t?' · '+t:'')}
+const _r=render;render=function(){_r();tidyHero();applyMode();paintCollapse();watchCloud();ensurePill()};
 })();
 
 </script>
