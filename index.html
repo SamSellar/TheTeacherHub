@@ -1406,7 +1406,1336 @@ const a2oldRender=render;render=function(){a2oldRender();let a=a2();document.bod
 document.addEventListener('keydown',ev=>{if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==='k'&&!board){ev.preventDefault();ev.stopImmediatePropagation();a2search()}},true);
 setInterval(()=>{let el=document.querySelector('.a2-timeline');if(el&&!el.contains(document.activeElement))el.outerHTML=a2timeline()},30000);/* Sign-in module loads the workspace and renders after verified authentication. */
 
-</script><script type="module">
+</script><script id="mod-planner-plus">
+/* ATLAS 3 · Planner module
+   Adds on top of ATLAS 2.4 (all additive; existing data shapes untouched):
+   - pointer-based lesson drag for mouse, touch and pen (native HTML5 drag disabled for lessons)
+   - undo for every planner change (button + Ctrl/Cmd+Z)
+   - extended lesson fields (LI, SC, explicit/guided/independent, differentiation, assessment, status)
+   - duplicate / bump-to-next-session / save-as-template actions
+   - per-term recurring timetable + dedicated timetable editor page
+   - relief teacher plan rebuilt (honours date overrides, always includes full notes)
+*/
+(function(){
+'use strict';
+const PU={undo:[],blockUntil:0};
+const EXTRA=['li','sc','explicit','guided','independent','diff','assess','status'];
+const toast=(msg,undoable)=>{let t=document.getElementById('puToast');if(!t){t=document.createElement('div');t.id='puToast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');document.body.append(t)}
+ t.innerHTML='';const s=document.createElement('span');s.textContent=msg;t.append(s);if(undoable){const b=document.createElement('button');b.type='button';b.textContent='Undo';b.onclick=()=>puUndo();t.append(b)}
+ t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{t.hidden=true},6000)};
+
+/* ---------- repair for double-escaped inline handlers in ATLAS 2.4 ----------
+   btn(label, `fn(${J(x)})`) escapes twice, so onclick="fn(&amp;quot;id&amp;quot;)" is a SyntaxError.
+   This broke "Swap slot" and "Move / copy" (the accessible alternatives to dragging). Repaired generically. */
+const HANDLER_ATTRS=['onclick','onchange','oninput','onsubmit'];
+function repairHandlers(root){if(!root||!root.querySelectorAll)return 0;let n=0;const sel=HANDLER_ATTRS.map(a=>`[${a}*="&"]`).join(',');
+ const list=root.matches&&root.matches(sel)?[root,...root.querySelectorAll(sel)]:root.querySelectorAll(sel);
+ for(const el of list)for(const a of HANDLER_ATTRS){const v=el.getAttribute(a);if(v&&/&(quot|#39|amp|lt|gt);/.test(v)){el.setAttribute(a,v.replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&'));n++}}
+ return n}
+window.puRepairHandlers=repairHandlers;
+new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes)if(n.nodeType===1)repairHandlers(n)}).observe(document.body,{childList:true,subtree:true});
+repairHandlers(document.body);
+
+/* ---------- undo ---------- */
+function snapshot(label){PU.undo.push({label,state:JSON.stringify({dates:plStore().dates,timetable:S.timetable,colours:plStore().colours})});if(PU.undo.length>40)PU.undo.shift()}
+function puUndo(){const u=PU.undo.pop();if(!u){toast('Nothing to undo');return}const s=JSON.parse(u.state);plStore().dates=s.dates;S.timetable=s.timetable;plStore().colours=s.colours;save();render();toast('Undid: '+u.label)}
+window.puUndo=puUndo;window.puState=()=>({drag:!!PU.drag,suppress:PU.suppressClick,undo:PU.undo.length});
+function guard(name,label,pred){const orig=window[name];if(typeof orig!=='function')return;window[name]=function(...a){snapshot(label);let r;try{r=orig.apply(this,a)}catch(err){PU.undo.pop();throw err}if(r===false||(pred&&!pred(r,a)))PU.undo.pop();return r}}
+guard('stSlotSwap','Swap lessons');
+guard('stMove','Move lesson');
+guard('plDelete','Delete lesson');
+guard('plCopyWeek','Copy last week');
+document.addEventListener('keydown',ev=>{if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'&&!ev.target.closest('input,textarea,select,[contenteditable]')&&document.querySelector('.pl-page,.st-day,.st-toolbar')&&PU.undo.length){ev.preventDefault();puUndo()}});
+
+/* ---------- per-term recurring timetable ---------- */
+const _plRows=plRows;
+plRows=function(ds){const rows=_plRows(ds);let term=null;try{term=schoolDay(dateObj(ds)).term||null}catch{}
+ if(!term)return rows;const ch=plDay(ds).changes||{};
+ return rows.filter(r=>!(r.recurring&&Array.isArray(r.terms)&&r.terms.length&&!r.terms.includes(term)&&!ch[r.id]))};
+
+/* ---------- extended lesson editor ---------- */
+const _plOpen=plOpen;
+plOpen=function(ds,id='',repeat=false){_plOpen(ds,id,repeat);const dlg=document.getElementById('plDialog');if(!dlg)return;
+ const l=plRows(ds).find(x=>x.id===id)||{};const f=(k,label,rows=2,ph='')=>`<label class="field">${e(label)}<textarea id="pu-${k}" rows="${rows}" placeholder="${e(ph)}">${e(l[k]||'')}</textarea></label>`;
+ const html=`<details class="pu-more" ${EXTRA.some(k=>l[k])?'open':''}><summary>Detailed lesson plan</summary>
+ ${f('li','Learning intention',2)}${f('sc','Success criteria',3,'One criterion per line')}${f('explicit','Explicit teaching',4)}${f('guided','Guided practice',3)}${f('independent','Independent practice',3)}${f('diff','Differentiation',3)}${f('assess','Assessment opportunities',2)}
+ <label class="field">Status<select id="pu-status">${['planned','taught','bumped'].map(s=>`<option value="${s}" ${((l.status||'planned')===s)?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join('')}</select></label></details>`;
+ const anchor=dlg.querySelector('#plRepeat')?.closest('label');anchor?.insertAdjacentHTML('beforebegin',html);
+ /* default notes for subject */
+ const sel=dlg.querySelector('#plSubject'),notes=dlg.querySelector('#plNotes');
+ if(!id&&sel&&notes){const apply=()=>{const d=(plStore().subjectDefaults||{})[sel.value];if(d?.notes&&!notes.value.trim())notes.value=d.notes};sel.addEventListener('change',apply);apply()}
+ /* actions for existing lessons */
+ if(id){const row=document.createElement('div');row.className='row pu-actions';
+  for(const [label,fn] of [['Duplicate',()=>puDuplicate(ds,id)],['Bump to next session',()=>puBump(ds,id)],['Save as template',()=>puSaveTemplate(ds,id)]]){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;row.append(b)}
+  dlg.querySelector('form').insertBefore(row,dlg.querySelector('form .row.between.section'))}
+};
+const _plCommit=plCommit;
+plCommit=function(){if(!plEdit)return;const {ds,id}=plEdit;const x={};for(const k of EXTRA){const el=document.getElementById('pu-'+k);if(el)x[k]=el.value}
+ const before=new Set((plDay(ds).extra||[]).map(r=>r.id)),beforeCh=new Set(Object.keys(plDay(ds).changes||{}));snapshot(id?'Edit lesson':'Add lesson');
+ const startVal=document.getElementById('plStart')?.value,endVal=document.getElementById('plEnd')?.value;
+ if(startVal&&endVal&&startVal>=endVal){PU.undo.pop();return _plCommit()}
+ _plCommit();
+ const p=plDay(ds);let row=null;
+ if(id){row=(p.changes||{})[id]&&!(p.changes[id].deleted)?p.changes[id]:(p.extra||[]).find(r=>r.id===id)}
+ else{row=(p.extra||[]).find(r=>!before.has(r.id))||null;if(!row){const k=Object.keys(p.changes||{}).find(k=>!beforeCh.has(k));if(k)row=p.changes[k]}}
+ if(!row){PU.undo.pop();return}
+ Object.assign(row,x);save();render()};
+const _plCard=plCard;
+plCard=function(l,ds){let h=_plCard(l,ds);const bits=[];
+ if(l.li)bits.push(`<div class="st-meta pu-li"><b>LI</b> ${e(l.li)}</div>`);
+ if(l.status==='taught')h=h.replace('class="pl-lesson"','class="pl-lesson pu-taught"');
+ if(l.status==='bumped')h=h.replace('class="pl-lesson"','class="pl-lesson pu-bumped"');
+ const badge=l.status&&l.status!=='planned'?`<div class="st-meta pu-status">${l.status==='taught'?'✓ Taught':'↷ Bumped'}</div>`:'';
+ return h.replace('</article>',bits.join('')+badge+'</article>')};
+
+function newId(){return typeof uid==='function'?uid():'l'+Math.random().toString(36).slice(2,9)}
+function stripIdentity(l){const c={...l};delete c.recurring;delete c.deleted;return c}
+function puDuplicate(ds,id){const l=plRows(ds).find(x=>x.id===id);if(!l)return;snapshot('Duplicate lesson');
+ const dur=(t)=>{const[h,m]=t.split(':').map(Number);return h*60+m};const fmtT=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+ const len=dur(l.end)-dur(l.start);let start=dur(l.end),end=start+len;if(end>24*60-1){end=24*60-1;start=Math.max(0,end-len)}
+ plMutable(ds).extra.push({...stripIdentity(l),id:newId(),start:fmtT(start),end:fmtT(end),notes:l.notes??plLegacyNote(ds,l)});plClose();save();render();toast('Lesson duplicated (this date only)',true)}
+function nextSchoolDay(ds){let d=dateObj(ds);for(let i=0;i<14;i++){d.setDate(d.getDate()+1);const k=schoolDay(d).kind;if(k==='School day')return dateISO(d)}return null}
+function puBump(ds,id){const l=plRows(ds).find(x=>x.id===id);if(!l)return;
+ /* next day this subject is timetabled */
+ let d=dateObj(ds),target=null,slot=null;for(let i=0;i<28&&!target;i++){d.setDate(d.getDate()+1);const dd=dateISO(d);if(schoolDay(d).kind!=='School day')continue;const s=plRows(dd).find(r=>r.subject===l.subject&&!(r.li||r.notes));if(s){target=dd;slot=s}}
+ if(!target){toast('No empty '+l.subject+' session found in the next four weeks');return}
+ snapshot('Bump lesson');const content=stripIdentity({...l,notes:l.notes??plLegacyNote(ds,l),status:'planned'});
+ const p=plMutable(target),row={...content,id:slot.id,start:slot.start,end:slot.end,recurring:slot.recurring,deleted:false};
+ if(slot.recurring)p.changes[slot.id]=row;else p.extra=p.extra.map(x=>x.id===slot.id?row:x);
+ const src=plMutable(ds);const mark={...(l.recurring?src.changes[id]||{}:{}),...l,status:'bumped',deleted:false};
+ if(l.recurring)src.changes[id]=mark;else src.extra=src.extra.map(x=>x.id===id?{...x,status:'bumped'}:x);
+ plClose();save();render();toast('Bumped to '+fmt(target)+' '+plTime(slot.start),true)}
+function puSaveTemplate(ds,id){const l=plRows(ds).find(x=>x.id===id);if(!l)return;const a=studio();const name=prompt('Template name',(l.name||l.subject)+' template');if(!name)return;
+ a.templates.push({id:newId(),name,subject:l.subject,body:[l.focus&&'Focus: '+l.focus,l.li&&'Learning intention: '+l.li,l.sc&&'Success criteria: '+l.sc,l.explicit&&'Explicit teaching: '+l.explicit,l.guided&&'Guided practice: '+l.guided,l.independent&&'Independent practice: '+l.independent,l.diff&&'Differentiation: '+l.diff,l.assess&&'Assessment: '+l.assess,l.notes].filter(Boolean).join('\n\n'),fields:Object.fromEntries(EXTRA.concat(['focus','notes']).map(k=>[k,l[k]||'']))});
+ save();toast('Saved as lesson template')}
+
+/* ---------- drag extras ----------
+   ATLAS 2.4 already ships pointer-event lesson dragging (mouse, touch, pen) that swaps slots.
+   It ignores drops that land on a day column rather than a lesson, so this adds that case.
+   Registered on window (capture) so it runs before the ATLAS handlers. */
+const DR={d:null};
+window.addEventListener('pointerdown',ev=>{if(ev.button!==0||!ev.isPrimary)return;const art=ev.target.closest&&ev.target.closest('.pl-lesson-head')?.closest('[data-st-id]');
+ DR.d=art?{x:ev.clientX,y:ev.clientY,pid:ev.pointerId,ds:art.dataset.stDate,id:art.dataset.stId,active:false}:null},true);
+const dayAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&!el.closest('[data-st-id]')?el.closest('.pl-day[data-st-drop],.st-day[data-st-drop]'):null};
+const clearDay=()=>document.querySelectorAll('.pu-day-target').forEach(x=>x.classList.remove('pu-day-target'));
+window.addEventListener('pointermove',ev=>{const d=DR.d;if(!d||ev.pointerId!==d.pid)return;if(!d.active&&Math.hypot(ev.clientX-d.x,ev.clientY-d.y)>=6)d.active=true;if(!d.active)return;
+ const t=dayAt(ev.clientX,ev.clientY);clearDay();if(t)t.classList.add('pu-day-target')},true);
+window.addEventListener('pointerup',ev=>{const d=DR.d;if(!d||ev.pointerId!==d.pid)return;DR.d=null;clearDay();if(!d.active)return;
+ const t=dayAt(ev.clientX,ev.clientY);if(!t)return;                       /* lesson targets are handled by ATLAS */
+ const dest=t.dataset.stDrop,l=plRows(d.ds).find(x=>x.id===d.id);if(!dest||!l)return;
+ ev.stopImmediatePropagation();ev.preventDefault();                       /* stop ATLAS clearing/handling this drop */
+ document.querySelectorAll('.st-slot-target,.st-slot-source').forEach(x=>x.classList.remove('st-slot-target','st-slot-source'));document.querySelectorAll('.st-pointer-ghost').forEach(x=>x.remove());
+ PU.blockUntil=Date.now()+450;
+ if(dest===d.ds){toast('Drop onto another lesson to swap, or use Move / copy for a new time.');return}
+ if(plRows(dest).some(x=>x.start<l.end&&x.end>l.start)){toast('That time is taken on '+fmt(dest)+'. Drop onto a lesson to swap, or use Move / copy.');return}
+ if(stMove(d.ds,d.id,dest,l.start,l.end)!==false)toast('Moved to '+fmt(dest)+' for that date only',true)},true);
+window.addEventListener('pointercancel',()=>{DR.d=null;clearDay()},true);
+window.addEventListener('click',ev=>{if(Date.now()<(PU.blockUntil||0)&&ev.target.closest&&ev.target.closest('.pl-lesson-head')){ev.preventDefault();ev.stopImmediatePropagation()}},true);
+/* feedback toast with Undo after every swap, whichever way it was triggered */
+(()=>{const g=window.stSlotSwap;window.stSlotSwap=function(...a){const r=g.apply(this,a);if(r!==false)toast('Swapped for these dates only',true);return r}})();
+
+/* ---------- timetable editor + relief plans pages ---------- */
+const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+function slotRow(s){const terms=[1,2,3,4].map(n=>`<label class="pu-term"><input type="checkbox" ${(!s.terms||!s.terms.length||s.terms.includes(n))?'checked':''} onchange="puSlotTerm(${J(s.id)},${n},this.checked)">T${n}</label>`).join('');
+ return `<tr><td><select aria-label="Subject" onchange="puSlot(${J(s.id)},'subject',this.value)">${stOptions(plSubjectNames(),s.subject)}</select></td><td><input aria-label="Start" type="time" value="${e(s.start)}" onchange="puSlot(${J(s.id)},'start',this.value)"></td><td><input aria-label="End" type="time" value="${e(s.end)}" onchange="puSlot(${J(s.id)},'end',this.value)"></td><td>${terms}</td><td><button onclick="puSlotDelete(${J(s.id)})" aria-label="Delete slot">Delete</button></td></tr>`}
+function conflicts(s,start=s.start,end=s.end,terms=s.terms){return S.timetable.some(x=>x.id!==s.id&&x.day===s.day&&x.start<end&&x.end>start&&(!x.terms?.length||!terms?.length||x.terms.some(t=>terms.includes(t))))}
+window.puSlot=(id,k,v)=>{const s=S.timetable.find(x=>x.id===id);if(!s)return;const n={...s,[k]:v};if(n.start>=n.end){alert('End time must be after start time.');render();return}
+ if(conflicts(s,n.start,n.end,n.terms)){alert('That overlaps another recurring lesson on the same day.');render();return}snapshot('Edit timetable');s[k]=v;save();render()};
+window.puSlotTerm=(id,n,on)=>{const s=S.timetable.find(x=>x.id===id);if(!s)return;let t=new Set(s.terms?.length?s.terms:[1,2,3,4]);on?t.add(n):t.delete(n);if(!t.size){alert('Keep at least one term.');render();return}
+ const arr=[...t].sort();if(conflicts(s,s.start,s.end,arr)){alert('That overlaps another recurring lesson in the same term.');render();return}snapshot('Edit timetable');s.terms=arr.length===4?undefined:arr;if(!s.terms)delete s.terms;save();render()};
+window.puSlotDelete=id=>{if(!confirm('Delete this recurring slot from every week? Dated changes you already made stay.'))return;snapshot('Delete slot');S.timetable=S.timetable.filter(x=>x.id!==id);save();render()};
+window.puSlotAdd=()=>{const v=k=>document.getElementById(k).value,terms=[1,2,3,4].filter(n=>document.getElementById('puNT'+n).checked);const s={id:newId(),day:v('puND'),subject:v('puNS'),start:v('puN1'),end:v('puN2')};if(terms.length&&terms.length<4)s.terms=terms;
+ if(!s.start||!s.end||s.start>=s.end)return alert('Choose a start time before the end time.');if(!terms.length)return alert('Pick at least one term.');if(conflicts(s))return alert('That overlaps another recurring lesson.');snapshot('Add timetable slot');S.timetable.push(s);save();render()};
+window.puSubjectColour=(n,c)=>{plStore().colours[n]=c;save()};
+window.puSubjectNotes=(n,v)=>{(plStore().subjectDefaults??={})[n]={...(plStore().subjectDefaults[n]||{}),notes:v};save()};
+window.puAddSubject=()=>{const n=prompt('New subject name');if(!n||!n.trim())return;if(!plSubjectNames().includes(n.trim())){plStore().labels.push(n.trim())}save();render()};
+stPages['Timetable editor']=()=>{const subs=plSubjectNames();
+ return `<div class="pu-editor"><p class="muted">The recurring timetable generates every week. Dragging a lesson in the planner never changes it. Untick terms to build a different timetable for each term.</p>
+ <div class="grid"><div class="card"><h2>Subjects</h2><div class="scroll"><table><tr><th>Subject</th><th>Colour</th><th>Default notes for new lessons</th></tr>${subs.map(n=>`<tr><td>${e(n)}</td><td><input type="color" aria-label="Colour for ${e(n)}" value="${plColour(n)}" onchange="puSubjectColour(${J(n)},this.value)"></td><td><textarea rows="2" aria-label="Default notes for ${e(n)}" onchange="puSubjectNotes(${J(n)},this.value)">${e((plStore().subjectDefaults||{})[n]?.notes||'')}</textarea></td></tr>`).join('')}</table></div><button onclick="puAddSubject()">＋ New subject</button></div>
+ <div class="card"><h2>Add recurring slot</h2><div class="row"><select id="puND">${days.map(d=>`<option>${d}</option>`).join('')}</select><select id="puNS">${subs.map(n=>`<option>${e(n)}</option>`).join('')}</select><input id="puN1" type="time" value="09:00" aria-label="Start"><input id="puN2" type="time" value="10:00" aria-label="End">${[1,2,3,4].map(n=>`<label class="pu-term"><input id="puNT${n}" type="checkbox" checked>T${n}</label>`).join('')}<button class="primary" onclick="puSlotAdd()">Add</button></div></div></div>
+ ${days.map(d=>{const rows=S.timetable.filter(x=>x.day===d).sort((a,b)=>a.start.localeCompare(b.start));return `<div class="card"><h2>${d}</h2>${rows.length?`<div class="scroll"><table><tr><th>Subject</th><th>Start</th><th>End</th><th>Terms</th><th></th></tr>${rows.map(slotRow).join('')}</table></div>`:'<p class="muted">No recurring lessons.</p>'}</div>`}).join('')}</div>`};
+const reliefStore=()=>(ext().relief??={general:'',includeEvents:true,includeAttachments:true});
+function reliefHTML(ds){const date=dateObj(ds),info=schoolDay(date),rows=plRows(ds),R=reliefStore(),events=R.includeEvents?[...S.events,...S.fun].filter(x=>x.date===ds):[];
+ const x=v=>e(String(v??'')),day=date.toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ const sec=(t,v)=>v?`<div class="sec"><h3>${x(t)}</h3><div class="txt">${x(v)}</div></div>`:'';
+ const res=l=>(l.links||'').split('\n').map(s=>s.trim()).filter(Boolean);
+ return `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relief plan ${x(fmt(ds))}</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;color:#1f2f27;font:10.5pt/1.45 'Century Gothic','URW Gothic',Futura,Arial,sans-serif;background:#fff}.page{max-width:190mm;margin:0 auto}header{border-bottom:2px solid #1f3a2d;padding-bottom:8px;margin-bottom:12px}.eyebrow{font-size:8.5pt;letter-spacing:1.4px;text-transform:uppercase;color:#426b50;font-weight:bold}h1{font-size:21pt;margin:2px 0}.meta{font-size:9.5pt;color:#46564d}.gen,.event{background:#eef3ec;border-radius:4px;padding:7px 10px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.lesson{border:1px solid #cfd9d2;border-left:7px solid var(--c);border-radius:4px;margin:0 0 9px;padding:8px 11px;break-inside:auto}.lh{display:flex;justify-content:space-between;gap:10px;break-after:avoid}.lh strong{font-size:12pt}.tm{white-space:nowrap;color:#46564d}.focus{font-weight:bold;margin:3px 0;break-after:avoid}.sec{margin:5px 0;break-inside:avoid-page}.sec h3{font-size:9pt;text-transform:uppercase;letter-spacing:.8px;color:#426b50;margin:0 0 1px;break-after:avoid}.txt{white-space:pre-wrap;overflow-wrap:anywhere;orphans:3;widows:3}.break{background:#f3f3f1;border-left-color:#8a8f8c;color:#46564d;padding:5px 11px}.res a{color:#1f3a2d}.actions{display:flex;gap:8px;justify-content:flex-end;margin:0 0 12px}.actions button{font:inherit;padding:8px 13px;border:1px solid #426b50;border-radius:7px;background:#fff;cursor:pointer}@media screen{body{background:#edf1eb;padding:16px}.page{background:#fff;padding:22px;box-shadow:0 3px 18px #0001}}@media print{.actions{display:none}body{padding:0}.page{max-width:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><main class="page"><div class="actions"><button onclick="window.print()">Save as PDF / Print</button><button onclick="window.close()">Close</button></div>
+ <header><div class="eyebrow">Relief teacher · Daily plan</div><h1>${x(day)}</h1><div class="meta">${[S.teacher&&'Teacher: '+S.teacher,S.school,S.className&&'Class: '+S.className,'Year '+hubYear()].filter(Boolean).map(x).join(' · ')}</div>${info.term?`<div class="meta">Term ${info.term} · Week ${info.week}</div>`:''}${info.kind!=='School day'&&info.kind!=='Calendar not configured'?`<div class="event">${x(info.kind)}</div>`:''}</header>
+ ${R.general?`<div class="sec"><h3>General instructions</h3><div class="gen">${x(R.general)}</div></div>`:''}${events.length?`<div class="sec"><h3>Today's events</h3>${events.map(v=>`<div class="event">${x(v.name)}</div>`).join('')}</div>`:''}
+ ${rows.length?rows.map(l=>{const n=l.notes??plLegacyNote(ds,l),isBreak=['Recess','Lunch'].includes(l.subject);
+  if(isBreak)return `<section class="lesson break" style="--c:#8a8f8c"><div class="lh"><strong>${x(l.name||l.subject)}</strong><span class="tm">${x(plTime(l.start))} – ${x(plTime(l.end))}</span></div></section>`;
+  return `<section class="lesson" style="--c:${plColour(l.subject)}"><div class="lh"><strong>${x(l.name||l.subject)}${l.name&&l.name!==l.subject?` <small>(${x(l.subject)})</small>`:''}</strong><span class="tm">${x(plTime(l.start))} – ${x(plTime(l.end))}</span></div>${l.focus?`<div class="focus">${x(l.focus)}</div>`:''}${sec('Learning intention',l.li)}${sec('Success criteria',l.sc)}${sec('Explicit teaching',l.explicit)}${sec('Guided practice',l.guided)}${sec('Independent practice',l.independent)}${sec('Differentiation',l.diff)}${sec('Assessment',l.assess)}${sec('Teaching notes',n)}${sec('Curriculum',l.curriculum)}${R.includeAttachments&&res(l).length?`<div class="sec res"><h3>Resources</h3>${res(l).map(u=>/^https?:\/\//i.test(u)?`<div><a href="${x(u)}">${x(u)}</a></div>`:`<div>${x(u)}</div>`).join('')}</div>`:''}</section>`}).join(''):'<p>No lessons scheduled for this date.</p>'}
+ </main></body></html>`}
+plReliefHTML=reliefHTML;
+let puReliefDate=dateISO(new Date());
+window.puReliefDate=v=>{puReliefDate=v||puReliefDate;render()};
+window.puReliefSet=(k,v)=>{reliefStore()[k]=v;save()};
+stPages['Relief teacher plans']=()=>{const R=reliefStore(),rows=plRows(puReliefDate);
+ return `<div class="row"><input type="date" value="${e(puReliefDate)}" onchange="puReliefDate(this.value)" aria-label="Date"><button class="primary" onclick="plReliefPDF(${J(puReliefDate)})">Open relief plan (print / save as PDF)</button></div>
+ <div class="card"><h2>General relief teacher instructions</h2><textarea rows="6" aria-label="General instructions" onchange="puReliefSet('general',this.value)" placeholder="Routines, behaviour expectations, first-aid, emergency procedures, helpful students…">${e(R.general)}</textarea><label><input type="checkbox" ${R.includeEvents?'checked':''} onchange="puReliefSet('includeEvents',this.checked)"> Include school events and fun days</label> <label><input type="checkbox" ${R.includeAttachments?'checked':''} onchange="puReliefSet('includeAttachments',this.checked)"> Include resource links</label><p class="muted">Student names, grades, profile notes and interview records are never included.</p></div>
+ <div class="card"><h2>${e(fmt(puReliefDate))} · ${rows.length} lessons</h2>${rows.map(l=>`<div class="pu-prev" style="border-left:6px solid ${plColour(l.subject)}"><b>${e(plTime(l.start))}–${e(plTime(l.end))}</b> ${e(l.name||l.subject)} <span class="muted">${(l.notes||l.focus||'').length?'· notes included':'· no notes yet'}</span></div>`).join('')||'<p class="muted">No lessons on this date.</p>'}</div>`};
+if(typeof stGo==='function'){/* navigation rebinding runs after every render because the sidebar is rebuilt */
+ const _render=render;render=function(){_render();for(const b of document.querySelectorAll('#nav .v11-menu button')){const t=b.textContent;if(t==='Manage subjects & timetable')b.onclick=()=>stGo('Timetable editor');if(t==='Relief teacher plans')b.onclick=()=>stGo('Relief teacher plans')}
+  if(document.querySelector('.pl-page,.st-day')&&!document.getElementById('puUndoBtn')){const host=document.querySelector('.pl-toolbar .row:last-child,.st-toolbar');if(host){const b=document.createElement('button');b.id='puUndoBtn';b.type='button';b.textContent='Undo'+(PU.undo.length?' ('+PU.undo.length+')':'');b.disabled=!PU.undo.length;b.onclick=puUndo;host.append(b)}}}}
+const css=document.createElement('style');css.textContent=`
+.pl-lesson-head{cursor:grab}.st-drag-grip{touch-action:none;padding:4px 6px;margin:-4px -6px}
+.pu-day-target{outline:3px dashed var(--accent);outline-offset:-3px;background:var(--soft)}
+.pl-lesson.st-slot-source{opacity:.45}
+.st-slot-target{outline:3px solid var(--accent)!important;outline-offset:2px}
+.pu-taught{opacity:.75}.pu-bumped{border-style:dashed}.pu-status{font-weight:700}.pu-li{font-size:12px}
+#puToast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:99999;background:#1d2b26;color:#fff;padding:10px 14px;border-radius:12px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 28px #0005;max-width:92vw}
+#puToast[hidden]{display:none}#puToast button{background:#c8e6a8;color:#1d2b26;border:0;font-weight:700;border-radius:8px;padding:5px 12px}
+.pu-more{margin:10px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px}.pu-more summary{font-weight:700;cursor:pointer}
+.pu-actions{gap:8px;flex-wrap:wrap;margin:10px 0}.pu-term{display:inline-flex;gap:3px;align-items:center;font-size:13px;margin-right:6px}
+.pu-editor .card{margin-bottom:12px}.pu-editor textarea,.pu-editor select{max-width:100%}
+.pu-prev{padding:6px 10px;margin:4px 0;background:var(--soft);border-radius:6px}
+@media(max-width:760px){#puToast{bottom:76px}}
+`;document.head.append(css);
+})();
+
+</script>
+<script id="mod-student-profile">
+/* ATLAS 3 · Central student profile + whole-class overview
+   Additive to ATLAS 2.4's S.atlas2.profiles[id] = {levels:{area:{...}}, records:[...]} so existing data keeps working.
+   New optional fields:
+     levels[area]  : grade, band (Above|At|Below), level, period, evidence, note, updated
+     records[]     : category, area, start, progress[{date,text}], action
+     profile.overview {priorities, info},  profile.done {interviewId: date}
+   Working levels are always teacher-assigned; nothing here infers a level from a grade. */
+(function(){
+'use strict';
+const AREAS=[...new Set([...a2areas,'Number','Algebra','Measurement','Space','Statistics','Probability'])];
+const BANDS=['','Above','At','Below'],GRADES=['','A','B','C','D','E'],PERIODS=['','Semester 1','Semester 2','Term 1','Term 2','Term 3','Term 4'];
+const LEVELS=['','Foundation',...Array.from({length:8},(_,i)=>'Year '+(i+1))];
+const CATS=['Academic','Personal','Social','Behavioural','Sporting','Creative','Leadership','Learning dispositions'];
+const CHANNELS=['Email summary','Phone call','Informal conversation','Formal meeting'];
+const COMM_KIND=['Information','Positive','Concern','Agreed action'];
+const TYPES=['Achievement','Learning goal','Observation','Parent communication','Learning support','Follow-up'];
+const SECTIONS=[['overview','Overview'],['achievement','Curriculum achievement'],['assessment','Assessment history'],['reading','Reading (DIBELS)'],['achievements','Achievements & strengths'],['goals','Learning goals'],['observations','Teacher observations'],['comms','Parent communication',1],['interviews','Interview history',1],['support','Learning support',1],['reports','Reports'],['actions','Follow-up actions']];
+let tab='overview';
+const today=()=>dateISO(new Date());
+const fm=d=>d?fmt(d):'';
+const P=id=>{const p=a2profile(id);p.overview??={priorities:'',info:''};p.done??={};return p};
+const b=(label,call,cls='')=>`<button type="button" class="${cls}" onclick="${call}">${e(label)}</button>`;
+const chip=(txt,kind)=>txt?`<span class="sp-chip sp-${kind}${txt&&kind==='grade'?' g-'+e(txt):''}">${e(txt)}</span>`:'';
+const sel=(opts,cur,call,label)=>`<select aria-label="${e(label)}" onchange="${call}">${opts.map(o=>`<option ${o===cur?'selected':''}>${e(o)}</option>`).join('')}</select>`;
+
+/* ---------- data helpers ---------- */
+const recs=(id,...types)=>P(id).records.filter(r=>!types.length||types.includes(r.type)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+const interviews=id=>studio().interviews.filter(r=>r.student===id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+const evidence=id=>studio().evidence.filter(r=>r.student===id);
+function actions(id){const p=P(id),out=[];
+ for(const r of p.records)if(['Parent communication','Learning support','Follow-up','Intervention'].includes(r.type)&&r.status!=='Complete'&&(r.action||r.type==='Follow-up'))out.push({kind:'record',id:r.id,text:r.action||r.text,due:r.due,source:r.type});
+ for(const i of interviews(id))if((i.actions||'').trim()&&!p.done[i.id])out.push({kind:'interview',id:i.id,text:i.actions,due:i.date,source:'Interview'});
+ return out.sort((a,b)=>String(a.due||'9999').localeCompare(String(b.due||'9999')))}
+function reading(id){const rows=dbPeriods.map((_,i)=>({period:dbPeriods[i],v:dbValues(dbRecord(id,i))}));
+ let last=null;rows.forEach((r,i)=>{if(r.v[0]!==null)last={i,band:dbBand(r.v[0],i,0),period:r.period}});
+ return {rows,latest:last?`${dbLabels[last.band]} · ${last.period}`:''}}
+function goalsActive(id){return recs(id,'Learning goal').filter(r=>r.status!=='Complete')}
+const lv=(id,area)=>P(id).levels[area]||{};
+function setLevel(id,area,k,v){const p=P(id);const l=(p.levels[area]??={});l[k]=v;l.updated=today();save()}
+window.spLevel=(id,area,k,v)=>{setLevel(id,area,k,v);refresh()};
+
+/* ---------- section renderers ---------- */
+const sec={
+overview(id){const p=P(id),act=actions(id),g=goalsActive(id),rd=reading(id).latest,lastC=recs(id,'Parent communication')[0];
+ return `<div class="sp-stats"><div><b>${e(S.className||'')}</b>Class</div><div><b>Year ${hubYear()}</b>Teaching year</div><div><b>${e(S.year)}</b>School year</div><div><b>${act.length}</b>Open actions</div><div><b>${g.length}</b>Active goals</div><div><b>${e(lastC?fm(lastC.date):'—')}</b>Last parent contact</div><div><b>${e(rd||'—')}</b>Reading (ORF)</div></div>
+ <label class="field">Learning priorities (teacher-assigned)<textarea rows="3" onchange="spOverview(${J(id)},'priorities',this.value)">${e(p.overview.priorities)}</textarea></label>
+ <label class="field">Important current information<textarea rows="3" onchange="spOverview(${J(id)},'info',this.value)">${e(p.overview.info)}</textarea></label>`},
+achievement(id){return `<p class="muted">Grade, expectation band and curriculum working level are recorded separately. A working level is only what you assign; it is never inferred from a grade.</p>
+ <div class="scroll"><table class="sp-table"><tr><th>Area</th><th>Grade</th><th>Expected achievement</th><th>Working level</th><th>Period</th><th>Evidence</th><th>Teacher notes</th><th>Updated</th></tr>
+ ${AREAS.map(a=>{const l=lv(id,a);return `<tr><th>${e(a)}</th><td>${sel(GRADES,l.grade||'','spLevel('+J(id)+','+J(a)+",'grade',this.value)",a+' grade')}</td><td>${sel(BANDS,l.band||'','spLevel('+J(id)+','+J(a)+",'band',this.value)",a+' expected achievement')}</td><td>${sel(LEVELS,l.level||'','spLevel('+J(id)+','+J(a)+",'level',this.value)",a+' working level')}</td><td>${sel(PERIODS,l.period||'','spLevel('+J(id)+','+J(a)+",'period',this.value)",a+' period')}</td><td><input aria-label="${e(a)} evidence" value="${e(l.evidence||'')}" onchange="spLevel(${J(id)},${J(a)},'evidence',this.value)"></td><td><input aria-label="${e(a)} notes" value="${e(l.note||'')}" onchange="spLevel(${J(id)},${J(a)},'note',this.value)"></td><td>${e(fm(l.updated))}</td></tr>`}).join('')}</table></div>`},
+assessment(id){const h=stHistory(id),ar=(window.asmRows?window.asmRows(id):[]);
+ return `<p class="muted">Results appear here automatically from gradebooks and Assessment centre. Blank results are not shown and never count as zero.</p>
+ <div class="scroll"><table class="sp-table"><tr><th>Assessment</th><th>Area</th><th>Date</th><th>Result</th><th>Grade</th></tr>
+ ${h.map(r=>`<tr><td>${e(r.name)}</td><td>${e(r.sub)}</td><td>${e(fm(r.date))}</td><td>${r.g.percent!==''&&r.g.percent!=null?e(r.g.percent)+'%':'—'}</td><td>${chip(effectiveGrade(r.g),'grade')}</td></tr>`).join('')}
+ ${ar.filter(x=>!h.some(r=>r.name===x.name&&String(r.date)===String(x.date))||x.rubric).map(x=>`<tr><td>${e(x.name)}</td><td>${e(x.area)}</td><td>${e(fm(x.date))}</td><td colspan="2">${e(x.result)}</td></tr>`).join('')}
+ ${h.length||ar.length?'':'<tr><td colspan="5">No recorded results yet.</td></tr>'}</table></div>`},
+reading(id){const r=reading(id);return `<div class="scroll"><table class="sp-table"><tr><th>Period</th><th>ORF words correct</th><th>Accuracy</th><th>MAZE adjusted</th></tr>${r.rows.map((x,i)=>`<tr><th>${e(x.period)}</th>${[0,1,2].map(j=>{const v=x.v[j];const bnd=v===null?-1:dbBand(v,i,j);return `<td>${v===null?'—':`${e(v)}${j===1?'%':''} <span class="sp-chip sp-band b${bnd}">${e(dbLabels[bnd])}</span>`}</td>`}).join('')}</tr>`).join('')}</table></div><p class="muted">ORF and MAZE are separate measures and are not combined.</p>`},
+achievements(id){return list(id,['Achievement'],'Add achievement',r=>`${chip(r.category,'cat')} ${e(fm(r.date))}`)},
+goals(id){return list(id,['Learning goal'],'Add learning goal',r=>`${e(r.area||'')} · ${r.start?'Started '+e(fm(r.start))+' · ':''}${r.due?'Review '+e(fm(r.due)):'No review date'} · ${e(r.status)}`,r=>`${r.outcome?`<p><b>Success measure:</b> ${e(r.outcome)}</p>`:''}${(r.progress||[]).map(x=>`<p class="sp-prog">${e(fm(x.date))}: ${e(x.text)}</p>`).join('')}${b('Add progress note',`spProgress(${J(id)},${J(r.id)})`)}`)},
+observations(id){const items=[...recs(id,'Observation').map(r=>({date:r.date,area:r.area,text:r.text,src:'Observation',rid:r.id})),...evidence(id).map(r=>({date:r.date,area:r.subject,text:r.note,src:'Evidence'}))].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ return `<div class="sp-bar">${b('Add observation',`spRecord(${J(id)},'','Observation')`,'primary')}</div>${items.map(x=>`<div class="sp-rec"><div class="sp-head"><span>${e(fm(x.date))} · ${e(x.area||'')}</span>${chip(x.src,'cat')}</div><p>${e(x.text)}</p>${x.rid?b('Edit',`spRecord(${J(id)},${J(x.rid)})`):''}</div>`).join('')||'<p class="muted">No observations yet.</p>'}`},
+comms(id){const ivs=interviews(id);return list(id,['Parent communication'],'Add communication',r=>`${chip(r.channel,'cat')} ${chip(r.category,'kind')} ${e(fm(r.date))}`,r=>`${r.action?`<p><b>Agreed action:</b> ${e(r.action)}${r.due?' · follow up '+e(fm(r.due)):''} · ${e(r.status)}</p>`:''}`)+(ivs.length?`<h4>Interviews</h4>`+ivs.map(i=>`<div class="sp-rec"><div class="sp-head"><span>${e(fm(i.date))} · ${e(i.status)}</span></div><p>${e(i.note||'')}</p></div>`).join(''):'')},
+interviews(id){return interviews(id).map(i=>`<div class="sp-rec"><div class="sp-head"><span>${e(fm(i.date))} ${e(i.time||'')} · ${e(i.status)}</span>${b('Edit',`stInterviewEdit(${J(i.id)})`)}</div>${[['Strengths','strength'],['Learning priorities','next'],['Discussion notes','note'],['Agreed actions','actions']].map(([n,k])=>i[k]?`<p><b>${n}:</b> ${e(i[k])}</p>`:'').join('')}</div>`).join('')||'<p class="muted">No interviews recorded. Add one in Students → Interview planner.</p>'},
+support(id){return list(id,['Learning support','Intervention'],'Add support record',r=>`${e(r.area||'')} · ${e(fm(r.date))} · ${e(r.status)}`,r=>`${r.outcome?`<p><b>Outcome / progress:</b> ${e(r.outcome)}</p>`:''}`)},
+reports(id){return ['1','2'].map(n=>{const c=ext().reports?.[n+'-'+id]?.comment;return `<div class="sp-rec"><div class="sp-head"><span>Semester ${n} · ${e(S.year)}</span></div><p>${c?e(c):'<span class="muted">No comment recorded.</span>'}</p></div>`}).join('')+b('Open comment builder',`stStudent=${J(id)};closeProfile();stGo('Comment builder')`)},
+actions(id){const a=actions(id);return a.map(x=>`<div class="sp-rec"><div class="sp-head"><span>${e(x.source)}${x.due?' · '+e(fm(x.due)):''}</span>${b('Mark complete',`spComplete(${J(id)},${J(x.kind)},${J(x.id)})`)}</div><p>${e(x.text)}</p></div>`).join('')||'<p class="muted">No outstanding actions.</p>'}
+};
+function list(id,types,addLabel,meta,extra=()=>''){return `<div class="sp-bar">${b(addLabel,`spRecord(${J(id)},'','${types[0]}')`,'primary')}</div>${recs(id,...types).map(r=>`<div class="sp-rec"><div class="sp-head"><span>${meta(r)}</span>${b('Edit',`spRecord(${J(id)},${J(r.id)})`)}</div><p>${e(r.text)}</p>${extra(r)}</div>`).join('')||'<p class="muted">Nothing recorded yet.</p>'}`}
+
+/* ---------- editor, actions, handlers ---------- */
+let closeFn=()=>{};
+const closeProfile=()=>{try{a2closeDrawer()}catch{}};window.closeProfile=closeProfile;
+function refresh(){if(document.getElementById('a2Drawer'))a2openProfile(a2drawer);else render()}
+window.spOverview=(id,k,v)=>{P(id).overview[k]=v;save()};
+window.spTab=t=>{tab=t;refresh()};
+window.spComplete=(id,kind,rid)=>{const p=P(id);if(kind==='record'){const r=p.records.find(x=>x.id===rid);if(r)r.status='Complete'}else p.done[rid]=today();save();refresh()};
+window.spProgress=(id,rid)=>{const r=P(id).records.find(x=>x.id===rid);if(!r)return;stDialog('Progress note · '+studentName(id),stField('Date','spPD',today(),'date')+stArea('Progress','spPT',''),()=>{if(!stVal('spPT').trim())return false;(r.progress??=[]).push({date:stVal('spPD'),text:stVal('spPT')});setTimeout(refresh,0)})};
+window.spRecord=(id,rid='',type='Achievement')=>{const p=P(id),r=p.records.find(x=>x.id===rid)||{},t=r.type||type;
+ const dlg=stDialog((rid?'Edit':'New')+' record · '+studentName(id),
+  stSelect('Type','spT',TYPES,t)+stField('Date','spD',r.date||today(),'date')+
+  `<div id="spDyn"></div>`+stArea(t==='Learning goal'?'Goal description':'Notes','spX',r.text||'')+
+  stSelect('Status','spS',['Open','In progress','Complete'],r.status||'Open'),
+  ()=>{if(!stVal('spX').trim())return false;const v={type:stVal('spT'),date:stVal('spD'),text:stVal('spX'),status:stVal('spS'),category:stVal('spC')||undefined,channel:stVal('spCh')||undefined,area:stVal('spA')||undefined,start:stVal('spSt')||undefined,due:stVal('spDue')||undefined,outcome:stVal('spO')||undefined,action:stVal('spAct')||undefined};
+   if(rid)Object.assign(r,v);else p.records.push({id:uid(),...v});setTimeout(refresh,0)});
+ const dyn=()=>{const tt=dlg.querySelector('#spT').value,box=dlg.querySelector('#spDyn');
+  const S_=(label,idv,arr,cur)=>`<label class="field">${e(label)}<select id="${idv}">${['',...arr].map(o=>`<option ${o===(cur||'')?'selected':''}>${e(o)}</option>`).join('')}</select></label>`;
+  const F_=(label,idv,cur,type='date')=>`<label class="field">${e(label)}<input id="${idv}" type="${type}" value="${e(cur||'')}"></label>`;
+  const A_=(label,idv,cur)=>`<label class="field">${e(label)}<textarea id="${idv}" rows="2">${e(cur||'')}</textarea></label>`;
+  box.innerHTML=
+   (tt==='Achievement'?S_('Category','spC',CATS,r.category):'')+
+   (tt==='Learning goal'?S_('Learning area','spA',AREAS,r.area)+F_('Start date','spSt',r.start)+F_('Review date','spDue',r.due)+A_('Success measure','spO',r.outcome):'')+
+   (tt==='Observation'?S_('Learning area','spA',AREAS,r.area):'')+
+   (tt==='Parent communication'?S_('Type of contact','spCh',CHANNELS,r.channel)+S_('Category','spC',COMM_KIND,r.category)+A_('Agreed action','spAct',r.action)+F_('Follow-up date','spDue',r.due):'')+
+   (tt==='Learning support'?S_('Learning area','spA',AREAS,r.area)+A_('Outcome / progress','spO',r.outcome)+A_('Action needed','spAct',r.action)+F_('Review / follow-up date','spDue',r.due):'')+
+   (tt==='Follow-up'?A_('Action','spAct',r.action)+F_('Due date','spDue',r.due):'')};
+ dlg.querySelector('#spT').addEventListener('change',dyn);dyn()};
+
+/* ---------- profile shell (used in the drawer and the full page) ---------- */
+function profileHTML(id){const nav=SECTIONS.map(([k,l])=>`<button type="button" role="tab" aria-selected="${k===tab}" class="${k===tab?'on':''}" onclick="spTab('${k}')">${e(l)}</button>`).join('');
+ const open=actions(id).length;
+ return `<div class="a2-profile sp-profile"><div class="a2-sectionhead"><h2>${e(studentName(id))}</h2><span class="sp-meta">${open?`<b>${open}</b> open action${open>1?'s':''}`:''}</span>${b('Export PDF…',`spExport(${J(id)})`,'primary')}</div><div class="sp-tabs" role="tablist">${nav}</div><div class="sp-body" role="tabpanel">${sec[tab](id)}</div></div>`}
+a2profileHTML=profileHTML;
+a2record=(id,rid='')=>spRecord(id,rid);
+a2printProfile=id=>spExport(id);
+
+/* ---------- export with explicit section choice ---------- */
+window.spExport=id=>{const body=SECTIONS.map(([k,l,conf])=>`<label class="sp-check"><input type="checkbox" id="spx-${k}" ${conf?'':'checked'}> ${e(l)}${conf?' <small>(confidential, off by default)</small>':''}</label>`).join('');
+ stDialog('Export profile · '+studentName(id),`<p class="muted">Choose exactly what to include. Confidential sections are off by default.</p>${body}`,()=>{const picked=SECTIONS.filter(([k])=>document.getElementById('spx-'+k).checked);if(!picked.length)return false;
+  const html=picked.map(([k,l])=>`<section><h2>${e(l)}</h2>${exportSection(k,id)}</section>`).join('');
+  stPrint(studentName(id)+' · profile',`<h1>${e(studentName(id))}</h1><p>${e([S.className,S.school,S.teacher].filter(Boolean).join(' · '))} · ${e(S.year)} · exported ${e(fmt(today()))}</p>${html}<style>section{margin:0 0 14px;break-inside:avoid-page}h2{font-size:13pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:3px 6px;font-size:9.5pt;text-align:left}</style>`);return true})};
+function exportSection(k,id){const p=P(id);
+ if(k==='overview')return `<p><b>Priorities:</b> ${e(p.overview.priorities)}</p><p><b>Current information:</b> ${e(p.overview.info)}</p>`;
+ if(k==='achievement')return `<table><tr><th>Area</th><th>Grade</th><th>Expected</th><th>Working level</th><th>Period</th><th>Notes</th></tr>${AREAS.filter(a=>{const l=lv(id,a);return l.grade||l.band||l.level}).map(a=>{const l=lv(id,a);return `<tr><td>${e(a)}</td><td>${e(l.grade||'')}</td><td>${e(l.band||'')}</td><td>${e(l.level||'')}</td><td>${e(l.period||'')}</td><td>${e(l.note||'')}</td></tr>`}).join('')}</table>`;
+ if(k==='assessment')return `<table><tr><th>Assessment</th><th>Date</th><th>Result</th><th>Grade</th></tr>${stHistory(id).map(r=>`<tr><td>${e(r.name)}</td><td>${e(fm(r.date))}</td><td>${r.g.percent!==''&&r.g.percent!=null?e(r.g.percent)+'%':''}</td><td>${e(effectiveGrade(r.g))}</td></tr>`).join('')}</table>`;
+ if(k==='reading')return `<table><tr><th>Period</th><th>ORF</th><th>Accuracy</th><th>MAZE</th></tr>${reading(id).rows.map((x,i)=>`<tr><td>${e(x.period)}</td>${[0,1,2].map(j=>`<td>${x.v[j]===null?'—':e(x.v[j])+(j===1?'%':'')+' ('+e(dbLabels[dbBand(x.v[j],i,j)])+')'}</td>`).join('')}</tr>`).join('')}</table>`;
+ if(k==='achievements')return recs(id,'Achievement').map(r=>`<p>${e(fm(r.date))} · ${e(r.category||'')}: ${e(r.text)}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='goals')return recs(id,'Learning goal').map(r=>`<p><b>${e(r.area||'')}</b> · ${e(r.status)} · review ${e(fm(r.due))}<br>${e(r.text)}<br><i>Success measure:</i> ${e(r.outcome||'')}${(r.progress||[]).map(x=>`<br>${e(fm(x.date))}: ${e(x.text)}`).join('')}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='observations')return [...recs(id,'Observation').map(r=>({d:r.date,a:r.area,t:r.text})),...evidence(id).map(r=>({d:r.date,a:r.subject,t:r.note}))].sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(x=>`<p>${e(fm(x.d))} · ${e(x.a||'')}: ${e(x.t)}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='comms')return recs(id,'Parent communication').map(r=>`<p>${e(fm(r.date))} · ${e(r.channel||'')} · ${e(r.category||'')}: ${e(r.text)}${r.action?'<br>Action: '+e(r.action):''}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='interviews')return interviews(id).map(i=>`<p>${e(fm(i.date))} · ${e(i.status)}<br>${e(i.note||'')}<br>${e(i.actions||'')}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='support')return recs(id,'Learning support','Intervention').map(r=>`<p>${e(fm(r.date))} · ${e(r.area||'')}: ${e(r.text)}${r.outcome?'<br>Outcome: '+e(r.outcome):''}</p>`).join('')||'<p>None recorded.</p>';
+ if(k==='reports')return ['1','2'].map(n=>`<p><b>Semester ${n}:</b> ${e(ext().reports?.[n+'-'+id]?.comment||'Not recorded')}</p>`).join('');
+ if(k==='actions')return actions(id).map(x=>`<p>${e(x.source)}${x.due?' · '+e(fm(x.due)):''}: ${e(x.text)}</p>`).join('')||'<p>None outstanding.</p>';
+ return ''}
+
+/* ---------- whole-class overview ---------- */
+const COLS=[['Reading',id=>gradeCell(id,'Reading')],['Writing',id=>gradeCell(id,'Writing')],['Spelling',id=>gradeCell(id,'Spelling')],['Maths',id=>gradeCell(id,'Maths')],
+ ['Working levels',id=>AREAS.filter(a=>lv(id,a).level).slice(0,4).map(a=>e(a.slice(0,5))+': '+e(lv(id,a).level)).join('<br>')||'—'],
+ ['Reading assessment',id=>e(reading(id).latest||'Not assessed')],['Achievements',id=>recs(id,'Achievement').length],['Parent contacts',id=>recs(id,'Parent communication').length],
+ ['Interview',id=>e(interviews(id)[0]?.status||'—')],['Open actions',id=>actions(id).length||'—'],['Current goals',id=>goalsActive(id).map(g=>e((g.text||'').slice(0,40))).join('<br>')||'—']];
+function gradeCell(id,a){const l=lv(id,a);return [chip(l.grade,'grade'),l.band?`<span class="sp-band-t">${e(l.band)}</span>`:'',l.level?`<small>${e(l.level)}</small>`:''].filter(Boolean).join(' ')||'—'}
+const colState=()=>(a2().spCols??=['Reading','Writing','Spelling','Maths','Reading assessment','Open actions']);
+let sortCol='Name',sortDir=1,q='',onlyOpen=false;
+window.spSort=c=>{if(sortCol===c)sortDir*=-1;else{sortCol=c;sortDir=1}render()};
+window.spCol=(c,on)=>{const s=colState();a2().spCols=on?[...new Set([...s,c])]:s.filter(x=>x!==c);save();render()};
+window.spQ=v=>{q=v;render();setTimeout(()=>document.getElementById('spQ')?.focus(),0)};
+window.spOpen=v=>{onlyOpen=v;render()};
+window.spShow=id=>{a2openProfile(id)};
+function classPage(){const cols=COLS.filter(([n])=>colState().includes(n));
+ let rows=S.students.filter(s=>(!q||s.name.toLowerCase().includes(q.toLowerCase()))&&(!onlyOpen||actions(s.id).length));
+ const key=s=>sortCol==='Name'?s.name.toLowerCase():String((COLS.find(c=>c[0]===sortCol)?.[1](s.id)))
+ rows=rows.slice().sort((a,b)=>sortDir*(key(a)>key(b)?1:key(a)<key(b)?-1:0));
+ return `<div class="sp-bar"><input id="spQ" type="search" placeholder="Search students" value="${e(q)}" onchange="spQ(this.value)" aria-label="Search students"><label><input type="checkbox" ${onlyOpen?'checked':''} onchange="spOpen(this.checked)"> Only students with open actions</label><details class="sp-cols"><summary>Columns</summary>${COLS.map(([n])=>`<label><input type="checkbox" ${colState().includes(n)?'checked':''} onchange="spCol(${J(n)},this.checked)"> ${e(n)}</label>`).join('')}</details></div>
+ <p class="muted">Working levels are teacher-assigned. Blank means not recorded, never zero. Select a name to open the full profile.</p>
+ <div class="scroll"><table class="sp-table"><tr><th><button class="sp-sort" onclick="spSort('Name')">Student ${sortCol==='Name'?(sortDir>0?'▲':'▼'):''}</button></th>${cols.map(([n])=>`<th><button class="sp-sort" onclick="spSort(${J(n)})">${e(n)} ${sortCol===n?(sortDir>0?'▲':'▼'):''}</button></th>`).join('')}</tr>
+ ${rows.map(s=>`<tr><th><button class="sp-name" onclick="spShow(${J(s.id)})">${e(s.name)}</button></th>${cols.map(([,f])=>`<td>${f(s.id)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${cols.length+1}">No students${S.students.length?' match':' yet. Add students in Settings → Class list'}.</td></tr>`}</table></div>`}
+stPages['Central student profiles']=classPage;
+stPages['Individual student profile']=()=>{const id=S.students.some(s=>s.id===stStudent)?stStudent:S.students[0]?.id;if(!id)return '<p class="muted">Add students in Settings → Class list first.</p>';
+ return `<div class="sp-bar"><label class="field">Student<select aria-label="Student" onchange="stStudent=this.value;render()">${S.students.map(s=>`<option value="${e(s.id)}" ${s.id===id?'selected':''}>${e(s.name)}</option>`).join('')}</select></label></div>${profileHTML(id)}`};
+/* point sidebar items at the new pages (sidebar is rebuilt on each render) */
+const _r=render;render=function(){_r();for(const bt of document.querySelectorAll('#nav .v11-menu button')){const t=bt.textContent;if(t==='Whole-class overview')bt.onclick=()=>stGo('Central student profiles');if(t==='Individual profiles')bt.onclick=()=>stGo('Individual student profile')}};
+const css=document.createElement('style');css.textContent=`
+.sp-tabs{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.sp-tabs button{border:1px solid transparent;background:transparent;border-radius:999px;padding:5px 12px;font-size:13px}
+.sp-tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.sp-stats div{background:var(--soft);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}.sp-stats b{display:block;font-size:17px;color:var(--ink)}
+.sp-rec{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0;background:var(--panel)}
+.sp-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12px;color:var(--muted)}.sp-rec p{margin:6px 0;white-space:pre-wrap}
+.sp-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.sp-table{width:100%;border-collapse:collapse}.sp-table th,.sp-table td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.sp-table select,.sp-table input{min-width:90px;max-width:210px}
+.sp-chip{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:700;background:var(--soft)}
+.sp-chip.g-A{background:#cfe8cf}.sp-chip.g-B{background:#dcecc0}.sp-chip.g-C{background:#fbf0b8}.sp-chip.g-D{background:#fbd9b4}.sp-chip.g-E{background:#f5c8c5}
+.sp-band.b0{background:#f5c8c5}.sp-band.b1{background:#ffe49a}.sp-band.b2{background:#cce5bc}.sp-band.b3{background:#c8dcf5}
+.sp-name{border:0;background:none;font-weight:700;color:var(--accent);text-align:left;padding:0}.sp-sort{border:0;background:none;font-weight:700;padding:0}
+.sp-cols{border:1px solid var(--line);border-radius:8px;padding:4px 10px}.sp-cols label{display:block}
+.sp-check{display:block;margin:6px 0}.sp-prog{font-size:13px;color:var(--muted)}
+body.a2-dark .sp-chip.g-A,body.a2-dark .sp-chip.g-B,body.a2-dark .sp-chip.g-C,body.a2-dark .sp-chip.g-D,body.a2-dark .sp-chip.g-E,body.a2-dark .sp-band{color:#1d2b26}
+`;document.head.append(css);
+})();
+
+</script>
+<script id="mod-assessment">
+/* ATLAS 3 · Assessment centre: rubric builder, rubric/score/checklist marking, gradebook sync
+   Principles (from the spec):
+   - no numeric value is ever attached to a rubric level unless the teacher defines a policy
+   - missing, absent and exempt results stay blank; they are never zero
+   - raw mark, percentage, suggested grade, teacher grade and working level stay separate
+   Backward compatible: legacy rubrics {name, criteria:[string], levels:[5 strings]} and their marks load unchanged. */
+(function(){
+'use strict';
+const PRESETS={'A–E':['A','B','C','D','E'],'Above / At / Below':['Above','At','Below'],'Beginning / Developing / Achieving / Extending':['Beginning','Developing','Achieving','Extending']};
+const STATUSES=['','Absent','Exempt','Incomplete'];
+const CHECK=['Achieved','Developing','Not yet'];
+const NARRATIVE=['Narrative structure','Sizzling start','Tension and action','Dialogue',"Show, Don't Tell",'Vocabulary','Sentence structure','Grammar','Punctuation','Spelling'];
+let draft=null,asmView='class',asmStudent='';
+const el=id=>document.getElementById(id);
+const b=(label,call,cls='')=>`<button type="button" class="${cls}" onclick="${call}">${e(label)}</button>`;
+
+/* ---------- rubric model ---------- */
+function norm(r){if(!r)return null;if(r.scale&&Array.isArray(r.criteria)&&typeof r.criteria[0]!=='string')return r;
+ const lv=['A','B','C','D','E'];return {...r,scale:{name:'A–E',levels:lv},criteria:(r.criteria||[]).map(c=>typeof c==='string'?{name:c,weight:1,descriptors:(r.levels||[]).slice(0,5)}:c),policy:r.policy||{points:null,gradeMap:{}},legacy:!r.scale}}
+const rubricOf=a=>norm(a.rubric||{name:a.name,criteria:a.criteria,levels:a.levels});
+window.asRubricOf=a=>rubricOf(a);const levelsOf=a=>a.type==='Checklist'?CHECK:rubricOf(a).scale.levels;
+function weighted(a,m){const r=rubricOf(a),pts=r.policy?.points;if(!pts)return null;const vals=pts&&Object.values(pts).map(Number).filter(Number.isFinite);if(!vals||!vals.length)return null;const max=Math.max(...vals);if(!(max>0))return null;
+ let num=0,den=0;for(let i=0;i<r.criteria.length;i++){const lvl=m[i];if(!lvl||pts[lvl]===undefined||pts[lvl]==='')return null;const w=Number(r.criteria[i].weight)||1;num+=w*Number(pts[lvl]);den+=w*max}
+ return den?Math.round(1000*num/den)/10:null}
+function hint(a,m){const r=rubricOf(a),c={};for(let i=0;i<r.criteria.length;i++)if(m[i])c[m[i]]=(c[m[i]]||0)+1;const top=Object.entries(c).sort((x,y)=>y[1]-x[1])[0];return top?`Most criteria at ${top[0]} (${top[1]} of ${r.criteria.length})`:''}
+
+/* ---------- marking + gradebook sync ---------- */
+function assignmentOf(a){return (S.assignments[a.subject]||[]).find(x=>x.id===a.id)}
+function sync(a,sid){const asg=assignmentOf(a);if(!asg)return;const m=a.marks[sid]||{};const g=(asg.results[sid]??={grade:'',percent:'',status:'',mode:S.gradeMode});
+ if(m.status){g.percent='';g.grade='';g.status=m.status;g.mode='manual';return}
+ if(a.type==='Score'||a.type==='Diagnostic'){const has=m.score!==''&&m.score!=null;g.percent=has?String(Math.round(1000*Number(m.score)/a.max)/10):'';g.grade='';g.mode='auto';g.status=has?'Completed':''}
+ else if(a.type==='Rubric'){const r=rubricOf(a),pct=weighted(a,m);g.status='';
+  if(pct!==null){g.percent=String(pct);g.grade='';g.mode='auto';g.status='Completed'}
+  else{g.percent='';const mapped=r.policy?.gradeMap?.[m.overall]||(r.scale.name==='A–E'&&r.scale.levels.includes(m.overall)?m.overall:'');g.grade=mapped||'';g.mode='manual';g.status=mapped?'Completed':''}}
+ else{g.percent='';g.grade='';g.status=''}}               /* checklists and observations never invent a percentage */
+window.asMark=(id,sid,k,v)=>{const a=studio().assessments.find(x=>x.id===id);if(!a)return;
+ if(k==='score'&&v!==''&&(!Number.isFinite(+v)||+v<0||+v>a.max)){alert('Score must be between 0 and '+a.max+'.');render();return}
+ const m=(a.marks[sid]??={});if(v===''||v==null)delete m[k];else m[k]=v;sync(a,sid);save();
+ if(k==='score'){const row=document.querySelector(`tr[data-sid="${sid}"]`),g=assignmentOf(a)?.results[sid];if(row&&row.cells.length>=5){row.cells[3].textContent=g&&g.percent!==''&&g.percent!=null?g.percent+'%':'—';row.cells[4].textContent=g?(effectiveGrade(g)||'—'):'—'}}
+ else if(k==='overall'||k==='status')render()};
+window.asCell=(id,sid,i,lvl)=>{const a=studio().assessments.find(x=>x.id===id);const m=(a.marks[sid]??={});if(m[i]===lvl)delete m[i];else m[i]=lvl;sync(a,sid);save();render()};
+stMark=(id,sid,k,v)=>asMark(id,sid,k,v);         /* legacy entry point used by older pages */
+window.asNew=()=>{const rubrics=studio().rubrics;
+ stDialog('Create assessment',stField('Assessment title','stName')+stSelect('Learning area','stSubject',subjects,'English')+stField('Date','stWhen',dateISO(new Date()),'date')+
+  stSelect('Type','stType',['Score','Rubric','Checklist','Diagnostic','Observation'],'Score')+stField('Maximum score (score types)','stMax',20,'number')+
+  `<label class="field">Rubric (rubric type)<select id="stRubric"><option value="">Select rubric</option>${rubrics.map(r=>`<option value="${e(r.id)}">${e(r.name)}</option>`).join('')}</select></label>`+
+  stField('Weighting (optional)','stWeight','','number')+stField('Curriculum codes','stCurr')+stArea('Teacher notes','stNote'),
+  ()=>{const name=stVal('stName').trim(),subject=stVal('stSubject'),type=stVal('stType'),max=Number(stVal('stMax')),r=norm(rubrics.find(x=>x.id===stVal('stRubric'))),date=stVal('stWhen');
+   if(!name||!date)return alert('Enter a title and date.'),false;
+   if((type==='Score'||type==='Diagnostic')&&!(max>0))return alert('Enter a maximum score above zero.'),false;
+   if(type==='Rubric'&&!r)return alert('Choose a rubric (build one in Rubric builder).'),false;
+   const id=uid();const sd=schoolDay(dateObj(date));
+   if(type!=='Observation')(S.assignments[subject]??=[]).push({id,name,date,term:sd.term||1,results:{},...(stVal('stWeight')?{weight:Number(stVal('stWeight'))}:{})});
+   const A={id,name,subject,type,max:(type==='Score'||type==='Diagnostic')?max:0,date,term:sd.term||1,semester:(sd.term||1)<=2?1:2,curriculum:stVal('stCurr'),note:stVal('stNote'),marks:{},criteria:r?r.criteria.map(c=>c.name):[],levels:r?.legacy?r.levels:(r?r.scale.levels:[]),...(r&&!r.legacy?{rubric:structuredClone(r)}:{})};
+   if(r&&r.legacy)A.rubric=structuredClone(r);studio().assessments.push(A);stAssessment=id;asmView='class';asmStudent=S.students[0]?.id||'';setTimeout(()=>stGo('Assessment centre'),0)})};
+stNewAssessment=window.asNew;
+
+/* ---------- Assessment centre page ---------- */
+function stat(a,sid){const m=a.marks[sid]||{};return m.status||''}
+function scoreTable(a){const asg=assignmentOf(a);return `<div class="scroll"><table class="as-table"><thead><tr><th>Student</th><th>Score / ${e(a.max)}</th><th>Status</th><th>Percent</th><th>Grade</th><th>Feedback</th></tr></thead><tbody>${S.students.map((s,i)=>{const m=a.marks[s.id]||{},g=asg?.results[s.id];return `<tr data-sid="${e(s.id)}"><th>${e(s.name)}</th><td><input class="as-score" data-i="${i}" type="number" min="0" max="${a.max}" step="any" aria-label="${e(s.name)} score" value="${e(m.score??'')}" ${m.status?'disabled':''} onchange="asMark(${J(a.id)},${J(s.id)},'score',this.value)" onkeydown="asEnter(event,${i})"></td><td><select aria-label="${e(s.name)} status" onchange="asMark(${J(a.id)},${J(s.id)},'status',this.value)">${stOptions(STATUSES,m.status||'')}</select></td><td>${g?.percent!==''&&g?.percent!=null?e(g.percent)+'%':'—'}</td><td>${g?e(effectiveGrade(g)||'—'):'—'}</td><td><input aria-label="${e(s.name)} feedback" value="${e(m.feedback||'')}" onchange="asMark(${J(a.id)},${J(s.id)},'feedback',this.value)"></td></tr>`}).join('')}</tbody></table></div>`}
+window.asEnter=(ev,i)=>{if(ev.key!=='Enter')return;ev.preventDefault();ev.target.blur();const n=document.querySelector(`.as-score[data-i="${i+1}"]`);if(n){n.focus();n.select()}};
+function checklistTable(a){return `<div class="scroll"><table class="as-table"><thead><tr><th>Student</th>${a.criteria.map(c=>`<th>${e(c)}</th>`).join('')}<th>Achieved</th><th>Feedback</th></tr></thead><tbody>${S.students.map(s=>{const m=a.marks[s.id]||{},n=a.criteria.filter((_,i)=>m[i]==='Achieved').length;return `<tr><th>${e(s.name)}</th>${a.criteria.map((c,i)=>`<td><select aria-label="${e(s.name+' '+c)}" onchange="asMark(${J(a.id)},${J(s.id)},${J(String(i))},this.value)">${stOptions(['',...CHECK],m[i]||'')}</select></td>`).join('')}<td>${a.criteria.some((_,i)=>m[i])?n+' of '+a.criteria.length:'—'}</td><td><input aria-label="${e(s.name)} feedback" value="${e(m.feedback||'')}" onchange="asMark(${J(a.id)},${J(s.id)},'feedback',this.value)"></td></tr>`}).join('')}</tbody></table></div><p class="muted">Checklists report counts only. No percentage or grade is invented.</p>`}
+function observationTable(a){return `<div class="scroll"><table class="as-table"><thead><tr><th>Student</th><th>Observation</th></tr></thead><tbody>${S.students.map(s=>`<tr><th>${e(s.name)}</th><td><textarea rows="2" aria-label="${e(s.name)} observation" onchange="asMark(${J(a.id)},${J(s.id)},'feedback',this.value)">${e((a.marks[s.id]||{}).feedback||'')}</textarea></td></tr>`).join('')}</tbody></table></div>`}
+function chipFor(lvl,r){return lvl?`<span class="as-lvl l${Math.min(r.scale.levels.indexOf(lvl),6)}">${e(lvl)}</span>`:'<span class="as-blank" aria-label="not marked">·</span>'}
+function rubricClass(a){const r=rubricOf(a);return `<div class="scroll"><table class="as-table"><thead><tr><th>Student</th>${r.criteria.map(c=>`<th>${e(c.name)}${Number(c.weight)>1?` <small>×${e(c.weight)}</small>`:''}</th>`).join('')}<th>Overall</th><th></th></tr></thead><tbody>${S.students.map(s=>{const m=a.marks[s.id]||{},done=r.criteria.filter((_,i)=>m[i]).length;return `<tr><th>${e(s.name)}</th>${r.criteria.map((_,i)=>`<td>${chipFor(m[i],r)}</td>`).join('')}<td>${m.overall?chipFor(m.overall,r):`<small class="muted">${done?done+'/'+r.criteria.length:'—'}</small>`}</td><td>${b('Mark',`asOpen(${J(s.id)})`)}</td></tr>`}).join('')}</tbody></table></div>`}
+window.asOpen=sid=>{asmStudent=sid;asmView='one';render()};window.asView=v=>{asmView=v;render()};
+function rubricOne(a){const r=rubricOf(a),sid=S.students.some(s=>s.id===asmStudent)?asmStudent:S.students[0]?.id,m=a.marks[sid]||{},i0=S.students.findIndex(s=>s.id===sid);if(!sid)return '<p class="muted">Add students first.</p>';
+ const pct=weighted(a,m);
+ return `<div class="as-nav">${b('‹ Previous',`asOpen(${J(S.students[Math.max(0,i0-1)].id)})`)}<select aria-label="Student" onchange="asOpen(this.value)">${S.students.map(s=>`<option value="${e(s.id)}" ${s.id===sid?'selected':''}>${e(s.name)}</option>`).join('')}</select>${b('Next ›',`asOpen(${J(S.students[Math.min(S.students.length-1,i0+1)].id)})`)}${b('Print assessed rubric',`asPrint(${J(a.id)},${J(sid)})`)}</div>
+ <div class="scroll"><table class="as-grid"><thead><tr><th>Criterion</th>${r.scale.levels.map(l=>`<th>${e(l)}</th>`).join('')}</tr></thead><tbody>${r.criteria.map((c,i)=>`<tr><th>${e(c.name)}${Number(c.weight)>1?` <small>×${e(c.weight)}</small>`:''}</th>${r.scale.levels.map((l,j)=>`<td><button type="button" class="as-cell ${m[i]===l?'on':''}" aria-pressed="${m[i]===l}" aria-label="${e(c.name)}: ${e(l)}" onclick="asCell(${J(a.id)},${J(sid)},${i},${J(l)})">${e((c.descriptors||[])[j]||'')}<i>${m[i]===l?'✓ '+e(l):''}</i></button></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+ <div class="as-over"><label class="field">Overall result (teacher-assigned)<select aria-label="Overall result" onchange="asMark(${J(a.id)},${J(sid)},'overall',this.value)">${stOptions(['',...r.scale.levels],m.overall||'')}</select></label>
+ <div class="muted">${e(hint(a,m))}${pct!==null?` · policy percentage ${e(pct)}%`:''}${r.policy?.points?'':' · No numeric policy: no percentage is calculated.'}</div>
+ <label class="field">Feedback<textarea rows="3" aria-label="Feedback" onchange="asMark(${J(a.id)},${J(sid)},'feedback',this.value)">${e(m.feedback||'')}</textarea></label></div>`}
+window.asCsv=id=>{const a=studio().assessments.find(x=>x.id===id);if(!a)return;const r=a.type==='Rubric'?rubricOf(a):null;const head=['Student',...(a.type==='Score'||a.type==='Diagnostic'?['Score','Max']:(r?r.criteria.map(c=>c.name):a.criteria)),'Overall / %','Status','Feedback'];
+ const rows=S.students.map(s=>{const m=a.marks[s.id]||{},g=assignmentOf(a)?.results[s.id];return [s.name,...(a.type==='Score'||a.type==='Diagnostic'?[m.score??'',a.max]:(r||{criteria:a.criteria.map(()=>0)}).criteria.map((_,i)=>m[i]??'')),a.type==='Rubric'?(m.overall||''):(g?.percent??''),m.status||'',m.feedback||'']});
+ download((a.name||'assessment').replace(/[^\w-]+/g,'_')+'.csv',[head,...rows].map(r=>r.map(x=>csvCell(x??'')).join(',')).join('\n'),'text/csv')};
+window.asPrint=(id,sid)=>{const a=studio().assessments.find(x=>x.id===id),r=rubricOf(a),m=(sid&&a.marks[sid])||{};
+ stPrint(a.name+(sid?' · '+studentName(sid):''),`${sid?`<p><b>Student:</b> ${e(studentName(sid))}</p>`:'<p>Name: ______________________ Date: ____________</p>'}${r.task?`<p>${e(r.task)}</p>`:''}<table class="rb"><tr><th>Criterion</th>${r.scale.levels.map(l=>`<th>${e(l)}</th>`).join('')}</tr>${r.criteria.map((c,i)=>`<tr><th>${e(c.name)}</th>${r.scale.levels.map((l,j)=>`<td class="${m[i]===l?'sel':''}">${e((c.descriptors||[])[j]||'')}${m[i]===l?' <b>✓</b>':sid?'':' □'}</td>`).join('')}</tr>`).join('')}</table>${sid&&m.overall?`<p><b>Overall:</b> ${e(m.overall)}</p>`:''}${sid&&m.feedback?`<p><b>Feedback:</b> ${e(m.feedback)}</p>`:''}<style>.rb{border-collapse:collapse;width:100%}.rb td,.rb th{border:1px solid #666;padding:4px 6px;font-size:9.5pt;vertical-align:top}.sel{background:#d9e8d0;font-weight:700}</style>`)};
+stPages['Assessment centre']=()=>{const A=studio().assessments,a=A.find(x=>x.id===stAssessment);
+ const top=`<div class="as-top">${b('New assessment','asNew()','primary')}${b('Rubric builder',"stGo('Rubric builder')")}<select aria-label="Choose assessment" onchange="stAssessment=this.value;render()"><option value="">Choose assessment</option>${A.map(x=>`<option value="${e(x.id)}" ${x.id===stAssessment?'selected':''}>${e(x.name)} · ${e(x.subject)}</option>`).join('')}</select>${a?b('Export CSV',`asCsv(${J(a.id)})`)+(a.type==='Rubric'?b('Print blank rubric',`asPrint(${J(a.id)})`):''):''}</div>`;
+ if(!a)return top+'<p class="muted">Create an assessment or select one to mark.</p>';
+ const body=a.type==='Score'||a.type==='Diagnostic'?scoreTable(a):a.type==='Checklist'?checklistTable(a):a.type==='Observation'?observationTable(a):
+  `<div class="as-tabs" role="tablist">${[['class','Class overview'],['one','Individual marking']].map(([k,l])=>`<button type="button" role="tab" aria-selected="${asmView===k}" class="${asmView===k?'on':''}" onclick="asView('${k}')">${l}</button>`).join('')}</div>${asmView==='one'?rubricOne(a):rubricClass(a)}`;
+ const marked=S.students.filter(s=>Object.keys(a.marks[s.id]||{}).some(k=>k!=='feedback')).length;
+ return top+`<div class="card"><h2>${e(a.name)}</h2><p class="muted">${e(a.type)} · ${e(a.subject)} · ${e(fmt(a.date||''))}${a.curriculum?' · '+e(a.curriculum):''} · ${marked} of ${S.students.length} marked · unmarked students stay blank</p>${body}</div>`};
+
+/* ---------- rubric builder ---------- */
+const clone=o=>structuredClone(o);
+function blankRubric(){return {id:uid(),name:'',area:'English',year:String(hubYear()),task:'',curriculum:'',scale:{name:'A–E',levels:[...PRESETS['A–E']]},criteria:[{name:'',weight:1,descriptors:PRESETS['A–E'].map(()=> '')}],policy:{points:null,gradeMap:{}}}}
+window.rbNew=()=>{draft=blankRubric();render()};
+window.rbEdit=id=>{draft=clone(norm(studio().rubrics.find(x=>x.id===id)));delete draft.legacy;render()};
+window.rbDup=id=>{const r=clone(norm(studio().rubrics.find(x=>x.id===id)));delete r.legacy;r.id=uid();r.name=r.name+' (copy)';studio().rubrics.push(r);save();render()};
+window.rbCancel=()=>{draft=null;render()};
+window.rbSet=(k,v)=>{draft[k]=v};
+window.rbCrit=(i,k,v)=>{draft.criteria[i][k]=v};
+window.rbDesc=(i,j,v)=>{draft.criteria[i].descriptors[j]=v};
+window.rbAdd=()=>{draft.criteria.push({name:'',weight:1,descriptors:draft.scale.levels.map(()=>'')});render()};
+window.rbDel=i=>{if(draft.criteria.length>1){draft.criteria.splice(i,1);render()}};
+window.rbMove=(i,d)=>{const j=i+d;if(j<0||j>=draft.criteria.length)return;[draft.criteria[i],draft.criteria[j]]=[draft.criteria[j],draft.criteria[i]];render()};
+window.rbTemplate=()=>{draft.name=draft.name||'Narrative writing';draft.area='English';draft.criteria=NARRATIVE.map(n=>({name:n,weight:1,descriptors:draft.scale.levels.map(()=> '')}));render()};
+window.rbScale=v=>{const lv=PRESETS[v]||draft.scale.levels;draft.scale={name:v,levels:[...lv]};draft.criteria.forEach(c=>{c.descriptors=lv.map((_,j)=>c.descriptors[j]||'')});draft.policy={points:null,gradeMap:{}};render()};
+window.rbCustom=v=>{const lv=v.split(',').map(x=>x.trim()).filter(Boolean);if(lv.length<2||lv.length>7||new Set(lv).size!==lv.length){alert('Enter 2 to 7 different level names separated by commas.');render();return}
+ draft.scale={name:'Custom',levels:lv};draft.criteria.forEach(c=>{c.descriptors=lv.map((_,j)=>c.descriptors[j]||'')});draft.policy={points:null,gradeMap:{}};render()};
+window.rbPolicy=on=>{draft.policy.points=on?Object.fromEntries(draft.scale.levels.map((l,i,a)=>[l,String(a.length-1-i)])):null;render()};
+window.rbPoints=(l,v)=>{draft.policy.points[l]=v};
+window.rbMap=(l,v)=>{(draft.policy.gradeMap??={})[l]=v;if(!v)delete draft.policy.gradeMap[l]};
+window.rbSave=()=>{const r=draft;if(!r.name.trim())return alert('Give the rubric a title.');if(!r.criteria.every(c=>c.name.trim()))return alert('Every criterion needs a name.');
+ if(r.policy.points){const vals=Object.values(r.policy.points);if(vals.some(v=>v===''||!Number.isFinite(+v)||+v<0))return alert('Points must be numbers, zero or more.')}
+ r.criteria.forEach(c=>{c.weight=Number(c.weight)>0?Number(c.weight):1});const list=studio().rubrics,i=list.findIndex(x=>x.id===r.id);if(i>=0)list[i]=r;else list.push(r);draft=null;save();render()};
+function editor(){const r=draft,lv=r.scale.levels;
+ return `<form class="card rb-edit" onsubmit="event.preventDefault();rbSave()"><h2>${studio().rubrics.some(x=>x.id===r.id)?'Edit rubric':'New rubric'}</h2>
+ <div class="rb-meta"><label class="field">Rubric title<input id="rbName" value="${e(r.name)}" oninput="rbSet('name',this.value)"></label><label class="field">Learning area<select onchange="rbSet('area',this.value)">${stOptions(subjects,r.area)}</select></label><label class="field">Year level<select onchange="rbSet('year',this.value)">${stOptions(['1','2','3','4','5','6'],String(r.year))}</select></label><label class="field">Curriculum codes<input value="${e(r.curriculum)}" oninput="rbSet('curriculum',this.value)"></label></div>
+ <label class="field">Task description<textarea rows="2" oninput="rbSet('task',this.value)">${e(r.task)}</textarea></label>
+ <div class="rb-meta"><label class="field">Achievement scale<select aria-label="Achievement scale" onchange="rbScale(this.value)">${[...Object.keys(PRESETS),'Custom'].map(k=>`<option ${k===r.scale.name?'selected':''}>${e(k)}</option>`).join('')}</select></label><label class="field">Level names (comma separated)<input aria-label="Level names" value="${e(lv.join(', '))}" onchange="rbCustom(this.value)"></label>${b('Narrative writing criteria','rbTemplate()')}</div>
+ <div class="scroll"><table class="rb-grid"><thead><tr><th>Criterion</th><th>Weight</th>${lv.map(l=>`<th>${e(l)}</th>`).join('')}<th></th></tr></thead><tbody>${r.criteria.map((c,i)=>`<tr><td><input aria-label="Criterion ${i+1} name" value="${e(c.name)}" oninput="rbCrit(${i},'name',this.value)"></td><td><input aria-label="Criterion ${i+1} weight" type="number" min="1" step="any" style="width:64px" value="${e(c.weight)}" oninput="rbCrit(${i},'weight',this.value)"></td>${lv.map((l,j)=>`<td><textarea rows="3" aria-label="Criterion ${i+1}, ${e(l)} descriptor" oninput="rbDesc(${i},${j},this.value)">${e(c.descriptors[j]||'')}</textarea></td>`).join('')}<td class="rb-act">${b('↑',`rbMove(${i},-1)`)}${b('↓',`rbMove(${i},1)`)}${b('✕',`rbDel(${i})`)}</td></tr>`).join('')}</tbody></table></div>${b('＋ Add criterion','rbAdd()')}
+ <details class="rb-policy" ${r.policy.points||Object.keys(r.policy.gradeMap||{}).length?'open':''}><summary>Grading policy (optional)</summary><p class="muted">By default a rubric produces no number. Turn these on only if you want the hub to calculate a percentage or send a grade to the gradebook.</p>
+ <label><input type="checkbox" aria-label="Calculate percentage" ${r.policy.points?'checked':''} onchange="rbPolicy(this.checked)"> Calculate a weighted percentage from points per level</label>${r.policy.points?`<div class="rb-pts">${lv.map(l=>`<label>${e(l)} <input aria-label="Points for ${e(l)}" type="number" min="0" step="any" style="width:70px" value="${e(r.policy.points[l])}" oninput="rbPoints(${J(l)},this.value)"></label>`).join('')}</div>`:''}
+ <p><b>Send to gradebook as grade</b> (optional mapping of overall level to grade)</p><div class="rb-pts">${lv.map(l=>`<label>${e(l)} → <select aria-label="Grade for ${e(l)}" onchange="rbMap(${J(l)},this.value)">${stOptions(['','A','B','C','D','E'],(r.policy.gradeMap||{})[l]||'')}</select></label>`).join('')}</div></details>
+ <div class="as-top"><button class="primary" type="submit">Save rubric</button><button type="button" onclick="rbCancel()">Cancel</button></div></form>`}
+function rubricCard(r0){const r=norm(r0);return `<div class="card"><h3>${e(r.name)}</h3><p class="muted">${e(r.area||'')}${r.year?' · Year '+e(r.year):''} · ${e(r.scale.name)}${r.curriculum?' · '+e(r.curriculum):''}</p><div class="scroll"><table class="as-grid"><thead><tr><th>Criterion</th>${r.scale.levels.map(l=>`<th>${e(l)}</th>`).join('')}</tr></thead><tbody>${r.criteria.map(c=>`<tr><th>${e(c.name)}${Number(c.weight)>1?` <small>×${e(c.weight)}</small>`:''}</th>${r.scale.levels.map((l,j)=>`<td>${e((c.descriptors||[])[j]||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="as-top">${b('Edit',`rbEdit(${J(r0.id)})`)}${b('Duplicate',`rbDup(${J(r0.id)})`)}${b('Print blank',`rbPrint(${J(r0.id)})`)}${b('Remove',`stRemove('rubrics',${J(r0.id)})`)}</div></div>`}
+window.rbPrint=id=>{const r=norm(studio().rubrics.find(x=>x.id===id));if(!r)return;stPrint(r.name,`<p>Name: ______________________ Date: ____________</p>${r.task?`<p>${e(r.task)}</p>`:''}<table class="rb"><tr><th>Criterion</th>${r.scale.levels.map(l=>`<th>${e(l)}</th>`).join('')}</tr>${r.criteria.map(c=>`<tr><th>${e(c.name)}</th>${r.scale.levels.map((l,j)=>`<td>${e((c.descriptors||[])[j]||'')} □</td>`).join('')}</tr>`).join('')}</table><style>.rb{border-collapse:collapse;width:100%}.rb td,.rb th{border:1px solid #666;padding:4px 6px;font-size:9.5pt;vertical-align:top}</style>`)};
+stPages['Rubric builder']=()=>draft?editor():`<div class="as-top">${b('Create rubric','rbNew()','primary')}${b('Assessment centre',"stGo('Assessment centre')")}</div>${studio().rubrics.map(rubricCard).join('')||'<p class="muted">No rubrics yet. Create one with your own criteria, levels and descriptors.</p>'}`;
+/* leaving the builder page abandons an unsaved draft */
+const _go=stGo;stGo=function(v){if(v!=='Rubric builder')draft=null;return _go.apply(this,arguments)};
+/* profile integration: rubric/score results with no gradebook grade still appear in the student profile */
+window.asmRows=sid=>studio().assessments.filter(a=>a.marks&&a.marks[sid]).map(a=>{const m=a.marks[sid];if(m.status)return {name:a.name,area:a.subject,date:a.date,result:m.status};
+ if(a.type==='Rubric'){const r=rubricOf(a);return {name:a.name,area:a.subject,date:a.date,result:(m.overall||'')+(r.criteria.some((_,i)=>m[i])?' ('+r.criteria.map((c,i)=>m[i]?c.name+': '+m[i]:'').filter(Boolean).join('; ')+')':''),rubric:true}}
+ if(a.type==='Checklist')return {name:a.name,area:a.subject,date:a.date,result:a.criteria.filter((_,i)=>m[i]==='Achieved').length+' of '+a.criteria.length+' achieved'};
+ return null}).filter(x=>x&&x.result);
+const css=document.createElement('style');css.textContent=`
+.as-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.as-nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.as-table,.as-grid,.rb-grid{border-collapse:collapse;width:100%}.as-table th,.as-table td,.as-grid th,.as-grid td,.rb-grid th,.rb-grid td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+.as-grid td{padding:0;min-width:150px}.as-cell{display:block;width:100%;min-height:68px;border:0;border-radius:0;background:var(--panel);text-align:left;padding:6px 8px;font-size:12px;white-space:pre-wrap}
+.as-cell i{display:block;font-style:normal;font-weight:700;margin-top:4px;color:var(--accent)}.as-cell.on{background:var(--soft);outline:2px solid var(--accent);outline-offset:-2px}
+.as-lvl{display:inline-block;border-radius:999px;padding:1px 9px;font-weight:700;font-size:12px;background:#e0e8d8;color:#1d2b26}.as-lvl.l0{background:#cfe8cf}.as-lvl.l1{background:#e3efc4}.as-lvl.l2{background:#fbf0b8}.as-lvl.l3{background:#fbd9b4}.as-lvl.l4{background:#f5c8c5}.as-blank{color:var(--muted)}
+.as-over{margin-top:12px;max-width:640px}.as-tabs{display:flex;gap:4px;margin:6px 0 12px}.as-tabs button{border-radius:999px;padding:5px 14px}.as-tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rb-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:end}.rb-grid textarea{min-width:150px;width:100%}.rb-act{white-space:nowrap}.rb-pts{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}.rb-policy{margin:12px 0;border:1px solid var(--line);border-radius:10px;padding:8px 12px}.rb-policy summary{font-weight:700;cursor:pointer}
+`;document.head.append(css);
+})();
+
+</script>
+<script id="mod-board">
+/* ATLAS 3 · Classroom board + teaching tools
+   - board can pull the current lesson (LI / SC / independent task / next) from the planner
+   - board never shows scores, profile data or notes; student names appear only in the tools, in the chosen name style
+   - tools: random student, groups, noise meter, dice, chance, angle game, complete the word (teacher supplies words)
+   - the original board designs, layouts, timer and panels are kept; this layer adds to them */
+(function(){
+'use strict';
+const TOOLS=[['student','Random student'],['groups','Groups'],['noise','Noise meter'],['dice','Dice'],['chance','Chance'],['angle','Angle game'],['word','Complete the word']];
+const BD={tool:'',picked:[],last:'',noise:1,dice:[],chance:{labels:['Heads','Tails'],tally:{},last:''},angle:{deg:null,guess:'',cls:'',shown:false,right:0,total:0},word:{i:0,hide:'vowels',reveal:false,mask:null}};
+const el=id=>document.getElementById(id);
+const bs=()=>{const a=ext();a.boardTools??={names:'first',words:[],groupId:'',dice:{n:2,sides:6}};return a.boardTools};
+const rnd=n=>{const u=new Uint32Array(1);crypto.getRandomValues(u);return u[0]%n};
+const b=(label,call,cls='')=>`<button type="button" class="${cls}" onclick="${call}">${e(label)}</button>`;
+const pool=()=>S.students.filter(s=>s.name&&!(S.excluded||[]).includes(s.id));
+function nm(s,i){const m=bs().names;const parts=String(s.name).trim().split(/\s+/);if(m==='none')return 'Student '+(i+1);if(m==='initials')return parts.map(p=>p[0]).join('').toUpperCase();if(m==='full')return s.name;return parts[0]}
+/* ---------- presets + remembered state ---------- */
+const BUILTIN=[{id:'b-maths',name:'Maths lesson',layout:'Explicit teaching',tool:'',minutes:15,linked:true,hidden:[]},{id:'b-reading',name:'Reading groups',layout:'Independent learning',tool:'groups',minutes:20,linked:true,hidden:[]},{id:'b-indep',name:'Independent work',layout:'Independent learning',tool:'noise',minutes:20,linked:true,hidden:[]},{id:'b-morning',name:'Morning welcome',layout:'Morning welcome',tool:'',minutes:10,linked:false,hidden:[]}];
+const presets=()=>[...BUILTIN,...(bs().presets||[])];
+let restored=null;
+function restoreState(){if(restored===S)return;restored=S;const st=bs().state;if(!st)return;if(Number.isInteger(st.noise)&&st.noise>=0&&st.noise<4)BD.noise=st.noise;if(Array.isArray(st.labels)&&st.labels.length>=2)BD.chance.labels=st.labels;if(['vowels','first','last','random'].includes(st.hide))BD.word.hide=st.hide}
+function persist(){bs().state={tool:BD.tool,noise:BD.noise,labels:BD.chance.labels,hide:BD.word.hide};save()}
+window.bdPreset=id=>{const p=presets().find(x=>x.id===id);if(!p)return;const b=studio().board;b.layout=p.layout||b.layout;if(p.design&&boardDesigns[p.design])b.design=p.design;b.minutes=p.minutes||b.minutes;bs().linked=!!p.linked;a2().boardHidden=[...(p.hidden||[])];BD.tool=p.tool||'';if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);if(typeof stResetTimer==='function')stResetTimer();persist();render();if(typeof stTimerDraw==='function')stTimerDraw()};
+window.bdPresetSave=()=>{stDialog('Save board preset',stField('Preset name','bdPn',''),()=>{const n=stVal('bdPn').trim();if(!n){alert('Enter a name.');return false}const b=studio().board;(bs().presets??=[]).push({id:uid(),name:n,layout:b.layout,design:b.design,minutes:b.minutes,linked:!!bs().linked,hidden:[...a2().boardHidden],tool:BD.tool});setTimeout(render,0)})};
+window.bdPresetDel=id=>{bs().presets=(bs().presets||[]).filter(x=>x.id!==id);save();render()};
+const nmById=id=>{const i=S.students.findIndex(s=>s.id===id);return i<0?'':nm(S.students[i],i)};
+
+/* ---------- planner-linked board ---------- */
+function lessonNow(){const d=new Date(),ds=dateISO(d),hh=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+ if(schoolDay(d).kind!=='School day')return{cur:null,next:null};
+ const rows=plRows(ds).filter(r=>!/^(recess|lunch)$/i.test(r.subject));
+ const cur=rows.find(r=>r.start<=hh&&hh<r.end)||null;const next=rows.find(r=>r.start>(cur?cur.start:hh)&&r!==cur)||null;
+ return{cur:cur||next,next:cur?next:rows.find(r=>r.start>(next?next.start:hh))||null,ds}}
+window.bdFromPlanner=()=>{const{cur,next}=lessonNow();if(!cur){alert('No lesson found for today in the planner.');return}
+ const bd=studio().board;Object.assign(bd,{intention:cur.li||'',criteria:cur.sc||'',task:cur.independent||cur.focus||'',next:next?(next.name||next.subject):''});save();render()};
+const _stBoard=stBoard;
+stBoard=function(){const root=ext().studio12,orig=root.board;
+ if(bs().linked){const{cur,next}=lessonNow();root.board={...orig,intention:cur?.li||orig.intention,criteria:cur?.sc||orig.criteria,task:cur?(cur.independent||cur.focus||orig.task):orig.task,next:next?(next.name||next.subject):orig.next}}
+ let html;try{html=_stBoard()}finally{root.board=orig}
+ restoreState();const tools=`<nav class="bd-tools" aria-label="Board tools"><select aria-label="Board preset" onchange="bdPreset(this.value);this.value=''"><option value="">Preset…</option>${presets().map(p=>`<option value="${e(p.id)}">${e(p.name)}</option>`).join('')}</select>${TOOLS.map(([k,l])=>`<button type="button" class="${BD.tool===k?'on':''}" onclick="bdTool('${k}')">${e(l)}</button>`).join('')}</nav>`;
+ html=html.replace('<div class="bd-grid">',tools+'<div class="bd-grid">');
+ if(BD.tool)html=html.replace(/<\/div>$/,`<div class="bd-overlay" role="dialog" aria-label="${e(TOOLS.find(t=>t[0]===BD.tool)[1])}"><div class="bd-ohead"><h2>${e(TOOLS.find(t=>t[0]===BD.tool)[1])}</h2>${b('Close','bdTool(\'\')')}</div><div class="bd-obody">${toolHTML(BD.tool)}</div></div></div>`);
+ return html};
+window.bdTool=k=>{restoreState();BD.tool=BD.tool===k?'':k;persist();if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);render();if(typeof stTimerDraw==='function')stTimerDraw()};
+
+/* ---------- tool bodies ---------- */
+function toolHTML(k){return({student:studentHTML,groups:groupsHTML,noise:noiseHTML,dice:diceHTML,chance:chanceHTML,angle:angleHTML,word:wordHTML})[k]()}
+function studentHTML(){const p=pool();return `<div class="bd-big">${e(BD.last||'Who’s next?')}</div><p class="bd-sub">${BD.picked.length} of ${p.length} chosen</p><div class="bd-row">${b('Pick a student','bdPick()','primary')}${b('Reset','bdPickReset()')}</div>`}
+window.bdPick=()=>{const p=pool();if(!p.length){BD.last='Add students first';render();return}let rest=p.filter(s=>!BD.picked.includes(s.id));if(!rest.length){BD.picked=[];rest=p}const s=rest[rnd(rest.length)];BD.picked.push(s.id);BD.last=nm(s,S.students.indexOf(s));rerender()};
+window.bdPickReset=()=>{BD.picked=[];BD.last='';rerender()};
+function groupsHTML(){const gs=studio().groups;if(!gs.length)return '<p class="bd-sub">No saved groups yet. Create them under Students › Learning groups.</p>';
+ const g=gs.find(x=>x.id===bs().groupId)||gs[0];
+ return `<div class="bd-row"><select aria-label="Group configuration" onchange="bs_setGroup(this.value)">${gs.map(x=>`<option value="${e(x.id)}" ${x.id===g.id?'selected':''}>${e(x.name)}</option>`).join('')}</select></div><div class="bd-groups">${g.labels.map((l,i)=>{const mem=S.students.filter(s=>(g.members||{})[s.id]===l||(g.members||{})[s.id]===i);return `<section class="bd-group"><h3>${e(l)}</h3>${mem.map(s=>`<div>${e(nm(s,S.students.indexOf(s)))}</div>`).join('')||'<div class="muted">—</div>'}</section>`}).join('')}</div>`}
+window.bs_setGroup=v=>{bs().groupId=v;save();rerender()};
+const NOISE=[['Silent','#2f7d4f','Silent work'],['Whisper','#6aa84f','Whisper voices'],['Partner','#e0a800','Partner voices'],['Too loud','#c0392b','Voices down']];
+function noiseHTML(){const n=NOISE[BD.noise];return `<div class="bd-noise" style="background:${n[1]}"><div class="bd-big" style="color:#fff">${e(n[0])}</div><div style="color:#fff">${e(n[2])}</div></div><div class="bd-row">${NOISE.map((x,i)=>b(x[0],`bdNoise(${i})`,i===BD.noise?'on':'')).join('')}</div>`}
+window.bdNoise=i=>{BD.noise=i;rerender()};
+function diceHTML(){const d=bs().dice;return `<div class="bd-dice">${BD.dice.map(v=>`<span class="bd-die">${v}</span>`).join('')||'<span class="bd-sub">Roll the dice</span>'}</div>${BD.dice.length>1?`<p class="bd-sub">Total ${BD.dice.reduce((a,c)=>a+c,0)}</p>`:''}<div class="bd-row"><label>Dice <input type="number" id="bdDn" min="1" max="6" value="${d.n}" onchange="bdDiceSet()"></label><label>Sides <input type="number" id="bdDs" min="2" max="100" value="${d.sides}" onchange="bdDiceSet()"></label>${b('Roll','bdRoll()','primary')}</div>`}
+window.bdDiceSet=()=>{const d=bs().dice;d.n=Math.max(1,Math.min(6,+el('bdDn').value||1));d.sides=Math.max(2,Math.min(100,+el('bdDs').value||6));save()};
+window.bdRoll=()=>{bdDiceSet();const d=bs().dice;BD.dice=Array.from({length:d.n},()=>1+rnd(d.sides));rerender()};
+function chanceHTML(){const c=BD.chance,tot=Object.values(c.tally).reduce((a,v)=>a+v,0);
+ return `<div class="bd-big">${e(c.last||'Spin to see')}</div><div class="bd-row"><label>Outcomes (comma separated) <input id="bdCh" value="${e(c.labels.join(', '))}" onchange="bdChSet()"></label>${b('Spin once','bdSpin(1)','primary')}${b('Spin ×10','bdSpin(10)')}${b('Spin ×100','bdSpin(100)')}${b('Clear','bdChClear()')}</div>
+ <table class="bd-table"><tr><th>Outcome</th><th>Count</th><th>Experimental</th><th>Theoretical</th></tr>${c.labels.map(l=>{const n=c.tally[l]||0;return `<tr><td>${e(l)}</td><td>${n}</td><td>${tot?(100*n/tot).toFixed(1)+'%':'—'}</td><td>${(100/c.labels.length).toFixed(1)}%</td></tr>`}).join('')}</table><p class="bd-sub">${tot} trial${tot===1?'':'s'}. Results vary; more trials get closer to the theoretical chance.</p>`}
+window.bdChSet=()=>{const l=el('bdCh').value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,12);if(l.length<2){alert('Enter at least two outcomes.');rerender();return}BD.chance={labels:l,tally:{},last:''};rerender()};
+window.bdSpin=n=>{const c=BD.chance;for(let i=0;i<n;i++){const l=c.labels[rnd(c.labels.length)];c.tally[l]=(c.tally[l]||0)+1;c.last=l}rerender()};
+window.bdChClear=()=>{BD.chance.tally={};BD.chance.last='';rerender()};
+const ANG=[['Acute','>0 and <90'],['Right','90'],['Obtuse','>90 and <180'],['Straight','180'],['Reflex','>180 and <360']];
+const angClass=d=>d<90?'Acute':d===90?'Right':d<180?'Obtuse':d===180?'Straight':'Reflex';
+function angleNew(silent){const a=BD.angle;a.deg=5*(1+rnd(71));a.guess='';a.cls='';a.shown=false;if(!silent)rerender()}
+function angleHTML(){const a=BD.angle,r=110,cx=130,cy=140,rad=a.deg*Math.PI/180,x=cx+r*Math.cos(-rad),y=cy+r*Math.sin(-rad),large=a.deg>180?1:0;
+ const arc=`M ${cx+34} ${cy} A 34 34 0 ${large} 0 ${cx+34*Math.cos(-rad)} ${cy+34*Math.sin(-rad)}`;
+ return `<svg class="bd-angle" viewBox="0 0 270 280" role="img" aria-label="An angle to estimate"><line x1="${cx}" y1="${cy}" x2="${cx+r}" y2="${cy}" stroke="currentColor" stroke-width="4"/><line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="currentColor" stroke-width="4"/><path d="${arc}" fill="none" stroke="var(--ba,#246d91)" stroke-width="3"/>${a.shown?`<text x="${cx}" y="${cy+40}" text-anchor="middle" font-size="26" fill="currentColor">${a.deg}°</text>`:''}</svg>
+ <div class="bd-row">${ANG.map(([n])=>b(n,`bdAngCls('${n}')`,a.cls===n?'on':'')).join('')}</div>
+ <div class="bd-row"><label>Estimate (°) <input id="bdAg" type="number" min="0" max="360" value="${e(a.guess)}"></label>${b('Reveal','bdAngReveal()','primary')}${b('New angle','bdAngNew()')}</div>
+ ${a.shown?`<p class="bd-sub">It is a <b>${angClass(a.deg)}</b> angle: <b>${a.deg}°</b>.${a.guess!==''?` Estimate off by ${Math.abs(a.deg-a.guess)}°.`:''}${a.cls?` Class ${a.cls===angClass(a.deg)?'correct':'not quite'}.`:''}</p>`:''}<p class="bd-sub">Class correct ${a.right} of ${a.total}</p>`}
+window.bdAngCls=n=>{BD.angle.cls=n;rerender()};
+window.bdAngNew=()=>angleNew();
+window.bdAngReveal=()=>{const a=BD.angle,g=el('bdAg')?.value;a.guess=g===''||g==null?'':+g;if(!a.shown){a.shown=true;if(a.cls){a.total++;if(a.cls===angClass(a.deg))a.right++}}rerender()};
+function wordList(){return bs().words}
+function wordNew(silent){const w=wordList();BD.word.reveal=false;BD.word.i=w.length?rnd(w.length):0;BD.word.mask=null;if(!silent)rerender()}
+function maskOf(word){if(BD.word.mask&&BD.word.mask.w===word)return BD.word.mask.m;const ch=[...word],idx=ch.map((c,i)=>/[a-z]/i.test(c)?i:-1).filter(i=>i>=0);let hide=[];
+ const h=BD.word.hide;if(h==='vowels')hide=idx.filter(i=>/[aeiou]/i.test(ch[i]));else if(h==='first')hide=idx.slice(0,Math.ceil(idx.length/3));else if(h==='last')hide=idx.slice(-Math.ceil(idx.length/3));else{const n=Math.max(1,Math.floor(idx.length/3));const c=[...idx];while(hide.length<n&&c.length)hide.push(c.splice(rnd(c.length),1)[0])}
+ if(!hide.length&&idx.length)hide=[idx[0]];BD.word.mask={w:word,m:new Set(hide)};return BD.word.mask.m}
+function wordHTML(){const w=wordList();if(!w.length)return `<p class="bd-sub">Add your own words (one per line) in <b>Teaching Tools › Teaching tools</b>, then come back.</p>`;
+ const word=w[BD.word.i%w.length],m=maskOf(word);
+ return `<div class="bd-big bd-word">${[...word].map((c,i)=>m.has(i)&&!BD.word.reveal?'<span class="bd-blank">_</span>':`<span>${e(c)}</span>`).join('')}</div><div class="bd-row"><label>Hide <select onchange="bdWordHide(this.value)">${[['vowels','Vowels'],['first','First letters'],['last','Last letters'],['random','Random letters']].map(([v,l])=>`<option value="${v}" ${BD.word.hide===v?'selected':''}>${l}</option>`).join('')}</select></label>${b(BD.word.reveal?'Hide again':'Reveal','bdWordReveal()','primary')}${b('Next word','bdWordNext()')}</div>`}
+window.bdWordHide=v=>{BD.word.hide=v;BD.word.mask=null;rerender()};
+window.bdWordReveal=()=>{BD.word.reveal=!BD.word.reveal;rerender()};
+window.bdWordNext=()=>wordNew();
+function rerender(){persist();render();if(typeof stTimerDraw==='function')stTimerDraw();if(typeof stTimer!=='undefined'&&typeof stRemaining!=='undefined'&&(stRemaining||stTimer))stTimerDraw()}
+
+/* ---------- Teaching tools page (outside board mode) ---------- */
+let pageTool='student';
+stPages['Teaching tools']=()=>{const s=bs();return `<div class="row section" role="tablist">${TOOLS.map(([k,l])=>`<button type="button" role="tab" aria-selected="${pageTool===k}" class="${pageTool===k?'primary':''}" onclick="bdPageTool('${k}')">${e(l)}</button>`).join('')}</div>
+ ${card(TOOLS.find(t=>t[0]===pageTool)[1],`<div class="bd-page">${toolHTML(pageTool)}</div>`)}
+ ${card('Settings for tools',`<label class="field">Student names shown in tools<select onchange="bs_names(this.value)">${[['first','First names'],['initials','Initials'],['full','Full names'],['none','Numbers only']].map(([v,l])=>`<option value="${v}" ${s.names===v?'selected':''}>${l}</option>`).join('')}</select></label>
+ <label class="field">Words for Complete the word (one per line, your own list)<textarea id="bdWords" rows="6">${e(s.words.join('\n'))}</textarea></label>${b('Save words','bdSaveWords()','primary')}
+ <label class="field" style="display:block"><input type="checkbox" ${s.linked?'checked':''} onchange="bs_link(this.checked)"> Classroom board follows today's planner (current lesson's LI, success criteria and independent task, and the next lesson)</label>${b('Copy current lesson to board once','bdFromPlanner()')}
+ <p class="muted">The board shows no scores, notes or profile data. Names appear only inside the tools above.</p>`)}`};
+window.bdPageTool=k=>{pageTool=k;if(k==='angle'&&BD.angle.deg===null)angleNew(true);if(k==='word')wordNew(true);render()};
+window.bs_names=v=>{bs().names=v;save();render()};
+window.bs_link=v=>{bs().linked=!!v;save()};
+window.bdSaveWords=()=>{bs().words=el('bdWords').value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,200);save();BD.word.mask=null;wordNew(true);render()};
+const _toolHTML=toolHTML;
+/* tool actions call render(); on the page they must stay on the page */
+
+/* ---------- navigation ---------- */
+const _r=render;render=function(){_r();
+ const grp=[...document.querySelectorAll('#nav .v11-group')].find(g=>g.querySelector('summary')?.textContent.includes('Teaching Tools'));
+ if(grp){const menu=grp.querySelector('.v11-menu');if(menu&&![...menu.querySelectorAll('button')].some(x=>x.textContent==='Teaching tools')){const proto=menu.querySelector('button');if(proto){const nb=proto.cloneNode(true);nb.textContent='Teaching tools';nb.onclick=()=>stGo('Teaching tools');nb.removeAttribute('onclick');nb.addEventListener('click',()=>stGo('Teaching tools'));menu.appendChild(nb)}}}
+ for(const x of document.querySelectorAll('#nav .v11-menu button'))if(x.textContent==='Teaching tools')x.onclick=()=>stGo('Teaching tools')};
+
+/* ---------- board studio additions ---------- */
+const _bsPage=stPages['Board studio'];
+stPages['Board studio']=()=>_bsPage()+card('Planner link and tools',`<label style="display:block"><input type="checkbox" ${bs().linked?'checked':''} onchange="bs_link(this.checked)"> Board follows today's planner</label>${b('Copy current lesson to board once','bdFromPlanner()')}${b('Open Teaching tools','stGo(\'Teaching tools\')')}`)+card('Board presets',`<p class="muted">A preset sets the layout, panels, timer length and tool in one click. Use the Preset menu on the board.</p>${presets().map(p=>`<div class="row"><b>${e(p.name)}</b><small>${e(p.layout)}${p.tool?' · '+e(TOOLS.find(t=>t[0]===p.tool)?.[1]||''):''} · ${p.minutes} min</small>${b('Apply and open board',`bdPreset('${e(p.id)}');toggleBoard()`)}${p.id.startsWith('b-')?'':b('Delete',`bdPresetDel('${e(p.id)}')`)}</div>`).join('')}${b('Save current board as preset','bdPresetSave()')}`);
+
+const st=document.createElement('style');st.textContent=`
+.bd-tools{display:flex;flex-wrap:wrap;gap:8px}
+.bd-board .bd-tools button.on,.bd-board .bd-row button.on{background:var(--ba);color:var(--bp)}
+.bd-board{position:relative}
+.bd-overlay{position:fixed;inset:0;z-index:50;background:var(--bb);color:var(--bt);padding:clamp(16px,3vw,48px);overflow:auto;display:flex;flex-direction:column;gap:18px}
+.bd-ohead{display:flex;justify-content:space-between;align-items:center}.bd-ohead h2{color:var(--ba);margin:0;font-size:clamp(20px,2.4vw,40px)}
+.bd-obody,.bd-page{display:grid;gap:18px;justify-items:center;text-align:center}
+.bd-big{font-size:clamp(40px,8vw,140px);font-weight:800;line-height:1.1;color:var(--ba)}
+.bd-page .bd-big{font-size:clamp(32px,5vw,72px);color:var(--accent)}
+.bd-sub{font-size:clamp(15px,1.6vw,26px);margin:0}
+.bd-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center}
+.bd-row input,.bd-row select{font-size:inherit;padding:8px;border-radius:8px}
+.bd-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;width:100%;text-align:left}
+.bd-group{background:var(--bp);border-radius:16px;padding:16px;border-top:6px solid var(--ba);font-size:clamp(16px,1.8vw,28px)}.bd-group h3{margin:0 0 8px;color:var(--ba)}
+.bd-noise{width:min(90%,900px);padding:40px;border-radius:24px}
+.bd-dice{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}.bd-die{display:grid;place-items:center;min-width:1.6em;height:1.6em;padding:0 .2em;font-size:clamp(36px,6vw,90px);font-weight:800;background:var(--bp,#fff);color:var(--bt,#222);border:4px solid var(--ba,#246d91);border-radius:18px}
+.bd-table{border-collapse:collapse;font-size:clamp(14px,1.6vw,24px)}.bd-table td,.bd-table th{padding:6px 16px;border-bottom:1px solid color-mix(in srgb,currentColor 20%,transparent)}
+.bd-angle{width:min(60vw,420px);color:var(--bt,#222)}
+.bd-word{letter-spacing:.1em}.bd-blank{display:inline-block;min-width:.6em;border-bottom:.08em solid currentColor;margin:0 .03em}
+.bd-page .bd-die{background:#fff;color:#222}.bd-page .bd-group{background:var(--panel,#fff)}.bd-page .bd-sub{font-size:16px}
+`;document.head.appendChild(st);
+})();
+
+</script>
+<script id="mod-reporting">
+/* ATLAS 3 · Reporting centre
+   - comment builder shows the evidence for the student (assessments, achievements, observations, DIBELS, evidence collector) beside the draft
+   - the teacher's own phrase bank (editable); no generated judgements; nothing is written for the teacher
+   - tracker with progress, over-limit and missing-evidence flags, CSV, whole-class print pack
+   Data stays in ext().reports['<sem>-<studentId>'] = {comment,strengths,next,status} (unchanged from ATLAS 2.4). */
+(function(){
+'use strict';
+const STATUS=['Not started','Draft','In review','Complete'];
+const SEED={attitude:['approaches learning positively','participates actively in class','benefits from encouragement to engage'],habits:['works independently','uses feedback to improve work','is developing independence'],progress:['has made steady progress','has made strong progress','is building confidence']};
+const el=id=>document.getElementById(id);
+const bank=()=>{const a=ext();a.commentBank??={attitude:[...SEED.attitude],habits:[...SEED.habits],progress:[...SEED.progress]};return a.commentBank};
+const limit=()=>studio().commentLimit||1200;
+const rep=(sem,id)=>(ext().reports[sem+'-'+id]||{});
+const first=s=>String(s.name).trim().split(/\s+/)[0];
+function evidenceFor(id){const out=[];
+ const seen=new Set();
+ try{(window.asmRows?asmRows(id):[]).forEach(r=>{seen.add(r.name);out.push({k:'Assessment',t:`${r.area||''} · ${r.name}: ${r.result}`.replace(/^ · /,'')})})}catch(x){}
+ try{stHistory(id).forEach(r=>{if(seen.has(r.name))return;const g=effectiveGrade(r.g),pc=r.g&&r.g.percent!==''&&r.g.percent!=null?r.g.percent+'%':'';const res=[g,pc].filter(Boolean).join(' · ');if(res)out.push({k:'Assessment',t:`${r.sub||''} · ${r.name}: ${res}`.replace(/^ · /,'')})})}catch(x){}
+ const p=(a2().profiles[id]||{records:[],levels:{}});
+ (p.records||[]).filter(r=>['Achievement','Observation','Learning goal'].includes(r.type)&&r.text).forEach(r=>out.push({k:r.type,t:(r.area?r.area+' · ':'')+r.text}));
+ studio().evidence.filter(x=>x.student===id).forEach(x=>out.push({k:'Evidence',t:`${x.subject} · ${x.note}`}));
+ return out}
+
+/* ---------- comment builder ---------- */
+let rSem='1',rStu='',rEv=true;
+stPages['Comment builder']=()=>{rSem=reportSem||rSem;const s=S.students.find(x=>x.id===(stStudent||rStu));rStu=s?s.id:'';const r=s?rep(rSem,s.id):{};const bk=bank();
+ const list=S.students,idx=s?list.indexOf(s):-1;
+ return `<div class="row section">${stPerson()}<select aria-label="Semester" onchange="reportSem=this.value;render()">${stOptions(['1','2'],reportSem)}</select>${stBtn('Load student',"stStudent=stVal('stPerson');render()",true)}${s?`${stBtn('◀ Previous',`rpStep(-1)`)}${stBtn('Next ▶',`rpStep(1)`)}`:''}</div>`+
+ (s?`<div class="rp-grid"><div>${card('Draft for '+e(first(s)),`<p class="muted">You write the comment. Phrases below only insert your own saved wording. Check every statement against the evidence.</p>
+  <div class="st-grid">${[['attitude','Learning attitude'],['habits','Work habits'],['progress','Progress']].map(([k,l])=>`<label class="field">${l}<select id="rp_${k}"><option value=""></option>${bk[k].map(x=>`<option>${e(x)}</option>`).join('')}</select></label>`).join('')}</div>
+  ${stArea('Specific strengths','stStrength',r.strengths)}${stArea('Areas for improvement / next steps','stNext',r.next)}${stBtn('Build draft','rpBuild()',true)}
+  ${stArea('Report comment','stComment',r.comment)}<div class="row"><span id="stChar" class="rp-count">${String(r.comment||'').length} / ${limit()}</span>${stField('Character limit','stLimit',limit(),'number')}</div>
+  ${stSelect('Status','stStatus',STATUS,r.status||'Draft')}<div class="row">${stBtn('Save','stSaveComment()',true)}${stBtn('Save & next student','rpStep(1,true)')}${stBtn('Copy comment','rpCopy()')}</div>`)}</div>
+  <div>${card('Evidence for '+e(first(s)),`<p class="muted">Click “Use” to add a line to the strengths box. Nothing is added automatically.</p>${evidenceFor(s.id).map((x,i)=>`<div class="rp-ev"><b>${e(x.k)}</b> ${e(x.t)} <button type="button" onclick="rpUse(${i})">Use</button></div>`).join('')||empty('No evidence recorded yet. Add achievements and observations in the student profile, or use the Evidence collector.')}`)}
+  ${card('My phrase bank',`<p class="muted">Edit one phrase per line. These only appear in the three lists.</p>${[['attitude','Learning attitude'],['habits','Work habits'],['progress','Progress']].map(([k,l])=>`<label class="field">${l}<textarea id="rpb_${k}" rows="3">${e(bk[k].join('\n'))}</textarea></label>`).join('')}${stBtn('Save phrases','rpSaveBank()')}`)}</div></div>`:empty('Choose a student.'))};
+window.rpUse=i=>{const s=S.students.find(x=>x.id===rStu);if(!s)return;const t=evidenceFor(s.id)[i]?.t;if(!t)return;const a=el('stStrength');a.value=(a.value.trim()?a.value.trim()+'\n':'')+t;a.focus()};
+window.rpBuild=()=>{const s=S.students.find(x=>x.id===rStu);if(!s)return;const n=first(s);const parts=['attitude','habits','progress'].map(k=>el('rp_'+k).value).filter(Boolean).map(v=>n+' '+v+'.');
+ for(const k of ['stStrength','stNext']){const v=stVal(k).trim();if(v)parts.push(v.replace(/\n+/g,' ').replace(/[.!?]?$/,'.'))}el('stComment').value=parts.join(' ');stCountComment()};
+window.rpSaveBank=()=>{const b=bank();for(const k of ['attitude','habits','progress'])b[k]=el('rpb_'+k).value.split('\n').map(x=>x.trim()).filter(Boolean);save();render()};
+window.rpCopy=()=>{const t=stVal('stComment');(navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>window.toast&&window.toast('Copied')).catch(()=>{const a=el('stComment');a.select();document.execCommand('copy')})};
+window.rpStep=(d,save1)=>{if(save1&&stVal('stComment')!==undefined)stSaveComment();const i=S.students.findIndex(x=>x.id===rStu),n=S.students[i+d];if(n){stStudent=n.id;render()}};
+stCountComment=function(){const n=stVal('stComment').length,L=+stVal('stLimit')||limit(),c=el('stChar');if(c){c.textContent=n+' / '+L+(n>L?' · over limit':'');c.classList.toggle('rp-over',n>L)}};
+const _sv=stSaveComment;stSaveComment=function(){const L=+stVal('stLimit')||limit();_sv();if(stVal('stComment').length>L)alert('This comment is over the character limit ('+L+'). It was saved as a draft.')};
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='stComment')stCountComment()});
+
+/* ---------- tracker ---------- */
+window.rFilter='';
+function state(s){const r=rep(rSem,s.id),n=String(r.comment||'').length;return{status:r.status||'Not started',n,over:n>limit(),noEv:!evidenceFor(s.id).length}}
+stPages['Reporting tracker']=()=>{rSem=reportSem||rSem;const all=S.students.map(s=>({s,...state(s)})),done=all.filter(x=>x.status==='Complete').length,rows=all.filter(x=>!window.rFilter||x.status===window.rFilter);
+ return `<div class="row section"><label>Semester <select onchange="reportSem=this.value;render()">${stOptions(['1','2'],reportSem)}</select></label><label>Show <select onchange="rFilter=this.value;render()"><option value="">All</option>${STATUS.map(x=>`<option ${window.rFilter===x?'selected':''}>${x}</option>`).join('')}</select></label>${stBtn('Export CSV','rpCsv()')}${stBtn('Print class report pack','rpPack()')}</div>
+ <div class="rp-prog" role="progressbar" aria-valuenow="${done}" aria-valuemin="0" aria-valuemax="${all.length}"><i style="width:${all.length?100*done/all.length:0}%"></i></div><p>${done} of ${all.length} complete</p>
+ <div class="scroll"><table><tr><th>Student</th><th>Status</th><th>Characters</th><th>Flags</th><th></th></tr>${rows.map(x=>`<tr><td>${e(x.s.name)}</td><td>${e(x.status)}</td><td class="${x.over?'rp-over':''}">${x.n} / ${limit()}</td><td>${[x.over?'Over limit':'',x.noEv&&x.status!=='Complete'?'No evidence':'',x.status==='Complete'&&!x.n?'Complete but empty':''].filter(Boolean).join(', ')||'—'}</td><td>${stBtn('Edit',`stStudent=${J(x.s.id)};stGo('Comment builder')`)}</td></tr>`).join('')}</table></div>`};
+window.rpCsv=()=>{const rows=[['Student','Semester','Status','Characters','Comment']].concat(S.students.map(s=>{const r=rep(rSem,s.id);return [s.name,rSem,r.status||'Not started',String(r.comment||'').length,r.comment||'']}));download(`reports-semester-${rSem}.csv`,rows.map(r=>r.map(csvCell).join(',')).join('\n'),'text/csv')};
+window.rpPack=()=>{const done=S.students.filter(s=>rep(rSem,s.id).comment);if(!done.length){alert('No comments written for this semester yet.');return}
+ stPrint(`Reports Semester ${rSem}`,done.map(s=>`<section style="break-after:page"><h1>${e(s.name)}</h1><p>${e(S.school||'')} · ${e(S.className||'')} · Semester ${e(rSem)}, ${e(S.year)}</p><p>${e(rep(rSem,s.id).comment)}</p></section>`).join(''))};
+
+/* ---------- Semester reports page: keep original, add shortcut ---------- */
+const css=document.createElement('style');css.textContent=`.rp-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}@media(max-width:900px){.rp-grid{grid-template-columns:1fr}}.rp-ev{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}.rp-ev button{margin-left:8px;font-size:12px;padding:2px 8px}.rp-over{color:#b3261e;font-weight:700}.rp-prog{height:12px;background:var(--line);border-radius:6px;overflow:hidden}.rp-prog i{display:block;height:100%;background:var(--accent)}`;document.head.appendChild(css);
+})();
+
+</script>
+<script id="mod-curriculum">
+/* ATLAS 3 · Curriculum planning and coverage
+   - uses the original ACARA V9 dataset (ACARA93.records) untouched; no codes are invented
+   - lesson editor: "Find ACARA codes" picker appends real codes to the lesson
+   - coverage map: area / year / strand / status / search, strand progress, linked lessons per code
+   - "Update from planner" previews and applies Planned/Taught upgrades, never downgrades, never touches Assessed/Revisit
+   Coverage statuses are stored exactly as before in S.coverage['official:<code>'] via acWrite. */
+(function(){
+'use strict';
+const STATUSES=['Not started','Planned','Teaching','Taught','Assessed','Revisit'];
+const RANK={'Not started':0,Planned:1,Teaching:2,Taught:3,Assessed:4,Revisit:4};
+const CODE=/AC9[A-Z0-9]+/g;
+const el=id=>document.getElementById(id);
+const V={area:'English',year:null,strand:'',status:'',q:''};
+const yr=()=>V.year||hubYear();
+const strands=a=>[...new Set(acFor(a,yr()).map(r=>r.strand).filter(Boolean))];
+
+/* ---------- linked lessons ---------- */
+function links(){const map={};const dates=ext().planner?.dates||{};
+ for(const ds of Object.keys(dates)){let rows;try{rows=plRows(ds)}catch(x){continue}
+  for(const l of rows){const m=String(l.curriculum||'').match(CODE);if(!m)continue;for(const c of new Set(m))(map[c]??=[]).push({ds,id:l.id,name:l.name||l.subject})}}
+ for(const a of studio().assessments||[]){const m=String(a.curriculum||'').match(CODE);if(m)for(const c of new Set(m))(map[c]??=[]).push({ds:a.date||'',id:a.id,name:a.name,assess:true})}
+ return map}
+const today=()=>dateISO(new Date());
+function proposals(){const L=links(),t=today(),out=[];
+ for(const [code,ls] of Object.entries(L)){const cur=acState(code).status||'Not started';if(cur==='Assessed'||cur==='Revisit')continue;
+  const past=ls.some(x=>!x.assess&&x.ds&&x.ds<t),future=ls.some(x=>!x.assess&&x.ds>=t);
+  const want=past?'Taught':future?'Planned':null;if(want&&RANK[want]>RANK[cur])out.push({code,from:cur,to:want})}
+ return out.sort((a,b)=>a.code.localeCompare(b.code))}
+
+/* ---------- coverage page ---------- */
+function rowsNow(){const q=V.q.toLowerCase().trim();return acFor(V.area,yr()).filter(r=>r.code&&(!V.strand||r.strand===V.strand)&&(!V.status||(acState(r.code).status||'Not started')===V.status)&&(!q||(r.code+' '+r.description+' '+r.strand+' '+(r.subStrand||'')).toLowerCase().includes(q)))}
+stPages['Curriculum coverage map']=()=>{const all=acFor(V.area,yr()),L=links(),sts=all.map(r=>acState(r.code).status||'Not started'),n=s=>sts.filter(x=>x===s).length,covered=sts.filter(x=>RANK[x]>=3).length;
+ const rows=rowsNow();
+ return `<div class="row section"><label>Learning area <select onchange="cvSet('area',this.value)">${stOptions(officialAreas,V.area)}</select></label><label>Year <select onchange="cvSet('year',+this.value)">${[1,2,3,4,5,6].map(y=>`<option value="${y}" ${yr()===y?'selected':''}>Year ${y}</option>`).join('')}</select></label><label>Strand <select onchange="cvSet('strand',this.value)"><option value="">All strands</option>${strands(V.area).map(s=>`<option ${V.strand===s?'selected':''}>${e(s)}</option>`).join('')}</select></label><label>Status <select onchange="cvSet('status',this.value)"><option value="">All</option>${STATUSES.map(s=>`<option ${V.status===s?'selected':''}>${s}</option>`).join('')}</select></label><input type="search" aria-label="Search curriculum" placeholder="Search code or text" value="${e(V.q)}" onchange="cvSet('q',this.value)"></div>
+ <div class="cv-sum"><b>${covered} of ${all.length}</b> content descriptions taught or assessed (${all.length?Math.round(100*covered/all.length):0}%) · ${STATUSES.map(s=>`${s} ${n(s)}`).join(' · ')}</div>
+ <div class="cv-strands">${strands(V.area).map(s=>{const rs=acFor(V.area,yr()).filter(r=>r.strand===s),d=rs.filter(r=>RANK[acState(r.code).status||'Not started']>=3).length;return `<div class="cv-strand"><span>${e(s)}</span><div class="cv-bar" role="progressbar" aria-valuenow="${d}" aria-valuemax="${rs.length}"><i style="width:${rs.length?100*d/rs.length:0}%"></i></div><small>${d}/${rs.length}</small></div>`}).join('')}</div>
+ <div class="row">${stBtn('Update statuses from planner','cvSyncPreview()',true)}${stBtn('Export coverage CSV','cvCsv()')}</div>
+ <p class="muted">${rows.length} matching. ${rows.length>120?'Showing the first 120; narrow with the filters.':''} Teacher-set statuses are never changed unless you confirm an update.</p>
+ <div class="scroll"><table><tr><th>Code</th><th>Strand</th><th>Content description</th><th>Status</th><th>Lessons</th></tr>${rows.slice(0,120).map(r=>{const ls=(L[r.code]||[]);return `<tr><th>${e(r.code)}</th><td>${e(r.strand)}</td><td>${e(r.description)}</td><td><select aria-label="Status for ${e(r.code)}" onchange="acWrite(${J(r.code)},'status',this.value,true)">${stOptions(STATUSES,acState(r.code).status||'Not started')}</select></td><td>${ls.length?ls.slice(0,3).map(x=>x.assess?e(x.name):`<button type="button" class="cv-link" onclick="plOpen(${J(x.ds)},${J(x.id)})">${e(fmt(x.ds))}</button>`).join(' '):'—'}${ls.length>3?' +'+(ls.length-3):''}</td></tr>`}).join('')}</table></div>`};
+window.cvSet=(k,v)=>{V[k]=v;if(k==='area'||k==='year')V.strand='';render()};
+window.cvSyncPreview=()=>{const p=proposals();if(!p.length){alert('No changes proposed. Link ACARA codes to lessons in the planner first.');return}
+ stDialog('Update coverage from planner',`<p>${p.length} status change${p.length>1?'s':''}. Statuses only move forward (Not started → Planned → Taught). Assessed and Revisit are left alone.</p><div class="scroll" style="max-height:320px"><table><tr><th>Code</th><th>From</th><th>To</th></tr>${p.map(x=>`<tr><td>${e(x.code)}</td><td>${e(x.from)}</td><td>${e(x.to)}</td></tr>`).join('')}</table></div>`,()=>{p.forEach(x=>acWrite(x.code,'status',x.to));setTimeout(render,0)})};
+window.cvCsv=()=>{const rows=[['Code','Learning area','Year','Strand','Description','Status','Linked lessons']];const L=links();for(const r of acFor(V.area,yr()))rows.push([r.code,r.area,yr(),r.strand,r.description,acState(r.code).status||'Not started',(L[r.code]||[]).length]);download(`coverage-${V.area}-year${yr()}.csv`,rows.map(r=>r.map(csvCell).join(',')).join('\n'),'text/csv')};
+
+/* ---------- code picker in the lesson editor ---------- */
+window.cvPick=()=>{const field=el('stCurr');if(!field)return;const sel=new Set((field.value.match(CODE)||[]));let a=V.area,y=yr(),q='';
+ const d=stDialog('Find ACARA V9 codes',`<div class="row"><label class="field">Learning area<select id="cvPa">${officialAreas.map(x=>`<option ${x===a?'selected':''}>${e(x)}</option>`).join('')}</select></label><label class="field">Year<select id="cvPy">${[1,2,3,4,5,6].map(v=>`<option value="${v}" ${v===y?'selected':''}>Year ${v}</option>`).join('')}</select></label><label class="field">Search<input id="cvPq" type="search"></label></div><div id="cvPl" class="scroll" style="max-height:340px"></div>`,()=>{const keep=(field.value.match(CODE)||[]).filter(c=>sel.has(c));const add=[...sel].filter(c=>!keep.includes(c));const rest=field.value.replace(CODE,'').replace(/[,;\s]+/g,' ').trim();field.value=[...(rest?[rest]:[]),...keep,...add].join(', ');});
+ const draw=()=>{a=el('cvPa').value;y=+el('cvPy').value;q=el('cvPq').value.toLowerCase();const rs=acFor(a,y).filter(r=>r.code&&(!q||(r.code+' '+r.description+' '+r.strand).toLowerCase().includes(q))).slice(0,60);
+  el('cvPl').innerHTML=rs.map(r=>`<label class="cv-pick"><input type="checkbox" value="${e(r.code)}" ${sel.has(r.code)?'checked':''}> <b>${e(r.code)}</b> ${e(r.description)}</label>`).join('')||'<p class="muted">No matches.</p>'};
+ d.addEventListener('change',ev=>{const t=ev.target;if(t.matches('#cvPl input')){t.checked?sel.add(t.value):sel.delete(t.value)}else if(t.id==='cvPa'||t.id==='cvPy')draw()});el('cvPq').addEventListener('input',draw);draw()};
+const _po=plOpen;plOpen=function(ds,id='',repeat=false){_po(ds,id,repeat);const f=el('stCurr');if(f&&!el('cvFind')){const b=document.createElement('button');b.type='button';b.id='cvFind';b.textContent='Find ACARA codes';b.onclick=cvPick;f.closest('label,.field')?.after(b)}};
+
+const css=document.createElement('style');css.textContent=`.cv-sum{margin:8px 0}.cv-strands{display:grid;gap:6px;margin:10px 0}.cv-strand{display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto;gap:10px;align-items:center;font-size:13px}.cv-bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden}.cv-bar i{display:block;height:100%;background:var(--accent)}.cv-link{font-size:12px;padding:2px 6px}.cv-pick{display:block;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}@media(max-width:700px){.cv-strand{grid-template-columns:1fr}}`;document.head.appendChild(css);
+})();
+
+</script>
+<script id="mod-resources">
+/* ATLAS 3 · Resource creation studio
+   - maths worksheets are validated by construction (no negative answers, exact division, no-regrouping / no-borrowing, tables-based ×÷)
+     and every worksheet has a matching answer key; a seed makes a sheet reproducible
+   - handwriting guide lines (3-line), trace / dotted / blank; spelling activities; quick writes
+   - saved resource settings; print / PDF through the existing print window
+   - no curriculum content, word lists or sentences are supplied by the app: the teacher provides them */
+(function(){
+'use strict';
+const TABS=['Maths','Handwriting','Spelling','Quick writes'];
+const el=id=>document.getElementById(id);
+let tab='Maths',html='',title='',key='',lastSeed=0;
+const store=()=>{const a=ext();a.resources??={settings:{},saved:[]};return a.resources};
+const DEF={
+ Maths:{title:'Maths practice',ops:['+'],count:20,min:1,max:100,noRegroup:false,noBorrow:false,tables:'2,3,4,5,10',maxFactor:12,layout:'horizontal',cols:2,key:true,seed:''},
+ Handwriting:{title:'Handwriting practice',words:'',style:'trace',lines:2,size:'medium',key:false},
+ Spelling:{title:'Spelling practice',words:'',activity:'lcwc',key:true,seed:''},
+ 'Quick writes':{title:'Quick write',prompt:'',lines:10,bank:'',timer:'',key:false}};
+const cfg=t=>({...DEF[t],...(store().settings[t]||{})});
+function prng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+const pick=(r,n)=>Math.floor(r()*n);
+const ri=(r,lo,hi)=>lo+pick(r,hi-lo+1);
+const digits=n=>String(n).split('').map(Number);
+
+/* ---------- maths generation (pure; exposed for testing) ---------- */
+function mathsItems(c,seed){const r=prng(seed),out=[],seen=new Set(),min=Math.max(0,Math.floor(c.min)),max=Math.max(min+1,Math.floor(c.max)),tabs=String(c.tables).split(',').map(x=>+x.trim()).filter(x=>Number.isInteger(x)&&x>=1&&x<=20),mf=Math.max(1,Math.min(20,+c.maxFactor||12));
+ const ops=c.ops.length?c.ops:['+'];
+ const one=op=>{
+  if(op==='+'){for(let t=0;t<400;t++){let a,b;if(c.noRegroup){const n=String(max).length;const da=[],db=[];for(let i=0;i<n;i++){const x=ri(r,i===0?1:0,9),y=ri(r,0,9-x);da.push(x);db.push(y)}a=+da.join('');b=+db.join('')}else{a=ri(r,min,max);b=ri(r,min,max)}
+    if(a>=min&&a<=max&&b>=min&&b<=max&&!(a===0&&b===0))return{op,a,b,ans:a+b}}return null}
+  if(op==='−'){for(let t=0;t<400;t++){let a,b;if(c.noBorrow){const n=String(max).length;const da=[],db=[];for(let i=0;i<n;i++){const x=ri(r,i===0?1:0,9),y=ri(r,0,x);da.push(x);db.push(y)}a=+da.join('');b=+db.join('')}else{a=ri(r,min,max);b=ri(r,min,max);if(b>a)[a,b]=[b,a]}
+    if(a<=max&&a>=min&&b>=0&&b<=a)return{op,a,b,ans:a-b}}return null}
+  if(op==='×'){if(!tabs.length)return null;const a=tabs[pick(r,tabs.length)],b=ri(r,1,mf);return r()<.5?{op,a,b,ans:a*b}:{op,a:b,b:a,ans:a*b}}
+  if(op==='÷'){if(!tabs.length)return null;const d=tabs[pick(r,tabs.length)],q=ri(r,1,mf);return{op,a:d*q,b:d,ans:q}}
+  return null};
+ for(let i=0;i<c.count;i++){let it=null;for(let t=0;t<60;t++){it=one(ops[pick(r,ops.length)]);if(!it)continue;const k=it.op+it.a+'_'+it.b;if(!seen.has(k)){seen.add(k);break}if(t===59)seen.add(k)}if(!it)return{error:'Cannot build questions with these settings. Widen the number range or choose tables.'};out.push(it)}
+ return{items:out}}
+window.rsMaths=(c,seed)=>mathsItems({...DEF.Maths,...c},seed);
+
+function lines3(n,cls=''){return Array.from({length:n},()=>`<div class="rs-line ${cls}"></div>`).join('')}
+function build(){const c0=read(),s=store();s.settings[tab]=c0;save();const c=c0;lastSeed=c.seed!==''&&c.seed!=null&&c.seed!==undefined&&!isNaN(+c.seed)&&String(c.seed).trim()!==''?+c.seed:Math.floor(Math.random()*1e9);title=c.title||tab;const head='<p>Name: ____________________ &nbsp; Date: __________</p>';let body='',k='';
+ if(tab==='Maths'){const g=mathsItems(c,lastSeed);if(g.error){alert(g.error);return}
+  body=`<div class="rs-cols" style="grid-template-columns:repeat(${c.cols},1fr)">${g.items.map((q,i)=>c.layout==='vertical'?`<div class="rs-q"><span class="rs-n">${i+1}.</span><span class="rs-v"><i>${q.a}</i><i>${q.op} ${q.b}</i><i class="rs-rule"></i></span></div>`:`<p class="rs-q">${i+1}. ${q.a} ${q.op} ${q.b} = ______</p>`).join('')}</div>`;
+  k=g.items.map((q,i)=>`${i+1}. ${q.ans}`).join(' · ')}
+ else if(tab==='Handwriting'){const L=c.words.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,30);if(!L.length){alert('Enter the words or sentences you want students to practise.');return}
+  body=L.map(w=>`<div class="rs-hw rs-${c.size}"><div class="rs-guide ${c.style==='blank'?'':'on'}"><span class="rs-tr ${c.style}">${e(c.style==='blank'?'':w)}</span></div>${Array.from({length:Math.max(1,Math.min(6,c.lines))},()=>`<div class="rs-guide"><span class="rs-tr ${c.style==='dotted'?'dotted':''}">${c.style==='dotted'?e(w):''}</span></div>`).join('')}</div>`).join('')}
+ else if(tab==='Spelling'){const L=c.words.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,60);if(!L.length){alert('Enter your spelling words, one per line.');return}const r=prng(lastSeed);
+  if(c.activity==='lcwc')body=`<table class="rs-t"><tr><th>Word</th><th>Look</th><th>Cover, write</th><th>Check ✓</th></tr>${L.map(w=>`<tr><td>${e(w)}</td><td></td><td></td><td></td></tr>`).join('')}</table>`;
+  else if(c.activity==='missing'){const m=L.map(w=>{const ch=[...w],idx=ch.map((x,i)=>/[a-z]/i.test(x)?i:-1).filter(i=>i>=0),n=Math.max(1,Math.floor(idx.length/3)),h=new Set();while(h.size<n&&idx.length)h.add(idx.splice(pick(r,idx.length),1)[0]);return ch.map((x,i)=>h.has(i)?'_':x).join('')});body=L.map((w,i)=>`<p class="rs-q">${i+1}. ${e(m[i])} &nbsp; → &nbsp; ____________________</p>`).join('');k=L.map((w,i)=>`${i+1}. ${e(w)}`).join(' · ')}
+  else if(c.activity==='scramble'){const m=L.map(w=>{const ch=[...w];if(ch.length<2)return w;for(let t=0;t<20;t++){for(let i=ch.length-1;i>0;i--){const j=pick(r,i+1);[ch[i],ch[j]]=[ch[j],ch[i]]}if(ch.join('')!==w)break}return ch.join('')});body=L.map((w,i)=>`<p class="rs-q">${i+1}. ${e(m[i])} &nbsp; → &nbsp; ____________________</p>`).join('');k=L.map((w,i)=>`${i+1}. ${e(w)}`).join(' · ')}
+  else body=L.map((w,i)=>`<div class="rs-q">${i+1}. Write a sentence using <b>${e(w)}</b>.${lines3(2)}</div>`).join('')}
+ else{if(!c.prompt.trim()){alert('Enter a writing prompt.');return}
+  body=`<p class="rs-prompt">${e(c.prompt)}</p>${c.bank.trim()?`<div class="rs-bank"><b>Word bank:</b> ${e(c.bank.split('\n').filter(Boolean).join(' · '))}</div>`:''}${c.timer?`<p>Time: ${e(c.timer)} minutes</p>`:''}${lines3(Math.max(1,Math.min(40,c.lines)))}`}
+ html=head+body;key=(c.key&&k)?`<div style="break-before:page"><h2>Answer key</h2><p>${k}</p><p class="muted">Seed ${lastSeed}</p></div>`:'';
+ const pv=el('rsPreview');if(pv)pv.innerHTML=`<h2>${e(title)}</h2>${html}${key}`}
+function read(){const c={...cfg(tab)};const v=id=>{const x=el(id);return x?x.value:undefined};const chk=id=>{const x=el(id);return x?x.checked:undefined};
+ if(tab==='Maths'){Object.assign(c,{title:v('rsTitle'),ops:['+','−','×','÷'].filter(o=>chk('rsOp'+o.charCodeAt(0))),count:Math.max(1,Math.min(60,Math.floor(+v('rsCount')||20))),min:+v('rsMin')||0,max:+v('rsMax')||100,noRegroup:chk('rsNoReg'),noBorrow:chk('rsNoBor'),tables:v('rsTables'),maxFactor:+v('rsMf')||12,layout:v('rsLayout'),cols:+v('rsCols')||2,key:chk('rsKey'),seed:v('rsSeed')})}
+ else if(tab==='Handwriting')Object.assign(c,{title:v('rsTitle'),words:v('rsWords'),style:v('rsStyle'),lines:+v('rsLines')||2,size:v('rsSize')});
+ else if(tab==='Spelling')Object.assign(c,{title:v('rsTitle'),words:v('rsWords'),activity:v('rsAct'),key:chk('rsKey'),seed:v('rsSeed')});
+ else Object.assign(c,{title:v('rsTitle'),prompt:v('rsPrompt'),lines:+v('rsLines')||10,bank:v('rsBank'),timer:v('rsTimer')});
+ return c}
+const fld=(l,inner)=>`<label class="field">${l}${inner}</label>`;
+function form(){const c=cfg(tab);const t=fld('Worksheet title',`<input id="rsTitle" value="${e(c.title)}">`);
+ if(tab==='Maths')return t+`<fieldset class="rs-fs"><legend>Operations</legend>${[['+','Addition'],['−','Subtraction'],['×','Multiplication'],['÷','Division']].map(([o,n])=>`<label><input type="checkbox" id="rsOp${o.charCodeAt(0)}" ${c.ops.includes(o)?'checked':''}> ${n}</label>`).join(' ')}</fieldset>
+  <div class="st-grid">${fld('Questions (1–60)',`<input id="rsCount" type="number" min="1" max="60" value="${c.count}">`)}${fld('Smallest number (+ −)',`<input id="rsMin" type="number" min="0" value="${c.min}">`)}${fld('Largest number (+ −)',`<input id="rsMax" type="number" min="2" value="${c.max}">`)}${fld('Times tables for × ÷ (comma separated)',`<input id="rsTables" value="${e(c.tables)}">`)}${fld('Largest multiplier',`<input id="rsMf" type="number" min="1" max="20" value="${c.maxFactor}">`)}${fld('Layout',`<select id="rsLayout"><option value="horizontal" ${c.layout==='horizontal'?'selected':''}>Horizontal</option><option value="vertical" ${c.layout==='vertical'?'selected':''}>Vertical</option></select>`)}${fld('Columns',`<select id="rsCols">${[1,2,3,4].map(n=>`<option ${c.cols===n?'selected':''}>${n}</option>`).join('')}</select>`)}${fld('Seed (blank = new each time)',`<input id="rsSeed" value="${e(c.seed)}">`)}</div>
+  <label><input type="checkbox" id="rsNoReg" ${c.noRegroup?'checked':''}> Addition without regrouping</label> <label><input type="checkbox" id="rsNoBor" ${c.noBorrow?'checked':''}> Subtraction without borrowing</label> <label><input type="checkbox" id="rsKey" ${c.key?'checked':''}> Include answer key</label>`;
+ if(tab==='Handwriting')return t+fld('Words or sentences, one per line (you supply these)',`<textarea id="rsWords" rows="5">${e(c.words)}</textarea>`)+`<div class="st-grid">${fld('Style',`<select id="rsStyle">${[['trace','Grey trace'],['dotted','Dotted'],['blank','Blank guide lines']].map(([v,l])=>`<option value="${v}" ${c.style===v?'selected':''}>${l}</option>`).join('')}</select>`)}${fld('Practice lines per item',`<input id="rsLines" type="number" min="1" max="6" value="${c.lines}">`)}${fld('Size',`<select id="rsSize">${['small','medium','large'].map(v=>`<option ${c.size===v?'selected':''}>${v}</option>`).join('')}</select>`)}</div>`;
+ if(tab==='Spelling')return t+fld('Spelling words, one per line (you supply these)',`<textarea id="rsWords" rows="6">${e(c.words)}</textarea>`)+`<div class="st-grid">${fld('Activity',`<select id="rsAct">${[['lcwc','Look, cover, write, check'],['missing','Missing letters'],['scramble','Unscramble'],['sentence','Write a sentence']].map(([v,l])=>`<option value="${v}" ${c.activity===v?'selected':''}>${l}</option>`).join('')}</select>`)}${fld('Seed (blank = new each time)',`<input id="rsSeed" value="${e(c.seed)}">`)}</div><label><input type="checkbox" id="rsKey" ${c.key?'checked':''}> Include answer key</label>`;
+ return t+fld('Writing prompt (you supply this)',`<textarea id="rsPrompt" rows="3">${e(c.prompt)}</textarea>`)+`<div class="st-grid">${fld('Writing lines',`<input id="rsLines" type="number" min="1" max="40" value="${c.lines}">`)}${fld('Timer (minutes, optional)',`<input id="rsTimer" value="${e(c.timer)}">`)}</div>`+fld('Word bank (optional, one per line)',`<textarea id="rsBank" rows="3">${e(c.bank)}</textarea>`)}
+stPages['Resource creation studio']=()=>{const sv=store().saved;
+ return `<div class="row section" role="tablist">${TABS.map(x=>`<button type="button" role="tab" aria-selected="${tab===x}" class="${tab===x?'primary':''}" onclick="rsTab('${x}')">${x}</button>`).join('')}</div>`+
+ card(tab,form()+`<div class="row"><button type="button" class="primary" onclick="rsBuild()">Generate preview</button><button type="button" onclick="rsPrint()">Print / PDF</button><button type="button" onclick="rsSave()">Save these settings</button></div>`)+
+ (sv.length?card('Saved settings',sv.map(x=>`<div class="row"><b>${e(x.name)}</b> <small>${e(x.tab)}</small><button type="button" onclick="rsLoad('${e(x.id)}')">Load</button><button type="button" onclick="rsDel('${e(x.id)}')">Delete</button></div>`).join('')):'')+
+ `<div id="rsPreview" class="st-preview rs-sheet">${html?`<h2>${e(title)}</h2>${html}${key}`:''}</div>`};
+window.rsTab=t=>{tab=t;html='';key='';render()};
+window.rsBuild=build;
+window.rsPrint=()=>{if(!html)build();if(!html)return;stPrint(title,`<style>.rs-cols{display:grid;gap:6px 24px}.rs-q{break-inside:avoid;margin:6px 0}.rs-v{display:inline-grid;text-align:right;font-size:18pt;font-family:monospace}.rs-v i{font-style:normal}.rs-rule{border-top:2px solid #000;height:30px}.rs-line{border-bottom:1px solid #777;height:34px}.rs-guide{position:relative;height:56px;margin:8px 0;border-top:1px solid #777;border-bottom:1px solid #777;background:linear-gradient(transparent 49%,#bbb 50%,transparent 51%)}.rs-tr{font-size:34pt;letter-spacing:3px;line-height:56px}.rs-tr.trace{color:#aaa}.rs-tr.dotted{color:transparent;-webkit-text-stroke:1px #666}.rs-small .rs-guide{height:40px}.rs-small .rs-tr{font-size:24pt;line-height:40px}.rs-large .rs-guide{height:74px}.rs-large .rs-tr{font-size:46pt;line-height:74px}.rs-t th,.rs-t td{height:34px;border:1px solid #888}.rs-bank{border:1px solid #888;padding:8px;margin:8px 0}</style>`+html+key)};
+window.rsSave=()=>{const c=read(),name=c.title||tab;if(!name)return;store().saved.push({id:uid(),name,tab,settings:c});save();render()};
+window.rsLoad=id=>{const x=store().saved.find(s=>s.id===id);if(!x)return;tab=x.tab;store().settings[tab]=x.settings;html='';key='';save();render()};
+window.rsDel=id=>{const s=store();s.saved=s.saved.filter(x=>x.id!==id);save();render()};
+const css=document.createElement('style');css.textContent=`.rs-sheet{background:#fff;color:#222;padding:18px;border-radius:10px;margin-top:12px}.rs-cols{display:grid;gap:6px 24px}.rs-q{margin:6px 0}.rs-v{display:inline-grid;text-align:right;font-family:monospace;font-size:20px}.rs-v i{font-style:normal}.rs-rule{border-top:2px solid #000;height:24px}.rs-line{border-bottom:1px solid #777;height:30px}.rs-guide{height:52px;margin:6px 0;border-top:1px solid #777;border-bottom:1px solid #777;background:linear-gradient(transparent 49%,#bbb 50%,transparent 51%)}.rs-tr{font-size:30px;letter-spacing:3px;line-height:52px}.rs-tr.trace{color:#aaa}.rs-tr.dotted{color:transparent;-webkit-text-stroke:1px #666}.rs-t{width:100%;border-collapse:collapse}.rs-t th,.rs-t td{border:1px solid #888;padding:8px;height:34px}.rs-fs{border:1px solid var(--line);border-radius:8px;margin:8px 0}.rs-bank{border:1px solid #888;padding:8px;margin:8px 0}`;document.head.appendChild(css);
+})();
+
+</script>
+<script id="mod-technical">
+/* ATLAS 3 · technical layer
+   - schema version + additive, idempotent migration (never deletes teacher data)
+   - backup validation with a preview, and an automatic pre-restore snapshot
+   - Version & privacy page: version, release notes, data summary, backup status
+   Cloud rules, auth and the owner-only model are untouched: this module only reads and writes S in memory and the usual save() path. */
+(function(){
+'use strict';
+const APP_VERSION='3.0.0',SCHEMA=3;
+window.HUB_VERSION=APP_VERSION;window.HUB_SCHEMA=SCHEMA;
+const el=id=>document.getElementById(id);
+
+/* ---------- migration (pure on the object passed in) ---------- */
+function migrate(d){const log=[];if(!d||typeof d!=='object')return{data:d,log};
+ const x=d.extension??(d===S?ext():(d.extension={}));const from=Number(x.schemaVersion)||2;
+ const ensure=(o,k,v,note)=>{if(o[k]===undefined||o[k]===null){o[k]=v;log.push(note||('added '+k))}};
+ ensure(x,'studio12',{schema:1,templates:[],rubrics:[],assessments:[],groups:[],evidence:[],interviews:[],board:{intention:'',criteria:'',task:'',next:'',minutes:15},favourites:[],recent:[],undo:null},'added studio12');
+ const s=x.studio12;for(const k of ['templates','rubrics','assessments','groups','evidence','interviews','favourites','recent'])if(!Array.isArray(s[k])){s[k]=[];log.push('repaired studio12.'+k)}
+ s.board??={intention:'',criteria:'',task:'',next:'',minutes:15};
+ for(const a of s.assessments){if(a&&typeof a==='object'){if(!a.marks||typeof a.marks!=='object'){a.marks={};log.push('repaired marks on '+a.name)}}}
+ if(x.planner&&typeof x.planner==='object'&&!x.planner.dates){x.planner.dates={};log.push('repaired planner dates')}  /* never create planner here: its own store initialises colours etc. */
+ ensure(x,'resources',{settings:{},saved:[]},'added resources store');
+ ensure(x,'boardTools',{names:'first',words:[],groupId:'',dice:{n:2,sides:6}},'added board tools store');
+ x.reports??={};
+ const at=d.atlas2;if(at&&typeof at==='object'){at.profiles??={};for(const id of Object.keys(at.profiles)){const p=at.profiles[id];if(!p||typeof p!=='object'){at.profiles[id]={levels:{},records:[]};log.push('repaired profile '+id);continue}if(!Array.isArray(p.records)){p.records=[];log.push('repaired records for '+id)}p.levels??={}}}
+ if(from<SCHEMA){x.migrationLog=[...(x.migrationLog||[]),{date:new Date().toISOString().slice(0,10),from,to:SCHEMA,app:APP_VERSION,changes:log.length}].slice(-20)}
+ x.schemaVersion=SCHEMA;return{data:d,log,from}}
+window.hubMigrate=migrate;
+let lastS=null;
+const _render=render;render=function(){if(S!==lastS){lastS=S;try{const r=migrate(S);if(r.log.length||r.from<SCHEMA)save()}catch(e){console.error('migration',e)}}_render()};
+
+/* ---------- backup validation ---------- */
+function validate(x){const errors=[],warnings=[];
+ if(!x||typeof x!=='object'||Array.isArray(x))return{errors:['The file is not a Teacher Hub backup.'],warnings,summary:null};
+ if(x.version!==1)errors.push('Unrecognised backup version.');
+ if(!Array.isArray(x.students))errors.push('Student list is missing.');
+ if(!Array.isArray(x.terms))errors.push('Term dates are missing.');
+ if(!x.assignments||typeof x.assignments!=='object'||Array.isArray(x.assignments))errors.push('Gradebook data is missing.');
+ const sv=Number(x.extension?.schemaVersion);if(sv>SCHEMA)errors.push('This backup was made by a newer version of the Hub (schema '+sv+'). Update the app before restoring it.');
+ if(Array.isArray(x.students)){const ids=x.students.map(s=>s&&s.id);if(ids.some(i=>typeof i!=='string'||!i))errors.push('A student has no id.');else if(new Set(ids).size!==ids.length)errors.push('Duplicate student ids.');if(x.students.some(s=>!s||typeof s.name!=='string'))warnings.push('Some students have no name.')}
+ if(x.assignments&&typeof x.assignments==='object')for(const [sub,l] of Object.entries(x.assignments))if(!Array.isArray(l))errors.push('Gradebook for '+sub+' is damaged.');
+ if(typeof a2demo==='function'&&a2demo(x))warnings.push('This backup contains fictional demo data.');
+ const st=x.extension?.studio12;
+ const summary=errors.length?null:{students:x.students.length,assessments:(st?.assessments||[]).length,rubrics:(st?.rubrics||[]).length,gradebookItems:Object.values(x.assignments||{}).reduce((a,l)=>a+(Array.isArray(l)?l.length:0),0),plannerDates:Object.keys(x.extension?.planner?.dates||{}).length,schema:sv||'older (will be upgraded)',size:JSON.stringify(x).length};
+ return{errors,warnings,summary}}
+window.hubValidateBackup=validate;
+
+restore=function(file){if(!file)return;file.text().then(t=>{let x;try{x=JSON.parse(t)}catch(e){alert('That file is not valid JSON, so it cannot be a backup.');return}
+ const v=validate(x);if(v.errors.length){alert('This backup cannot be restored:\n\n• '+v.errors.join('\n• '));return}
+ const dlg=document.createElement('dialog');dlg.className='pl-dialog st-dialog';dlg.id='restoreDlg';const s=v.summary;
+ dlg.innerHTML=`<form method="dialog"><h2>Restore backup</h2><p>This will replace the current workspace. A snapshot of your current data downloads first.</p><ul><li>${s.students} students</li><li>${s.assessments} assessments, ${s.rubrics} rubrics, ${s.gradebookItems} gradebook items</li><li>${s.plannerDates} planner dates with changes</li><li>Schema: ${e(String(s.schema))}</li></ul>${v.warnings.map(w=>`<p class="notice">${e(w)}</p>`).join('')}<div class="row"><button type="button" data-cancel>Cancel</button><button type="button" class="primary" data-go>Download snapshot and restore</button></div></form>`;
+ document.body.append(dlg);dlg.querySelector('[data-cancel]').onclick=()=>dlg.close();dlg.addEventListener('close',()=>dlg.remove());
+ dlg.querySelector('[data-go]').onclick=()=>{download('Teacher-Hub-pre-restore-'+dateISO(new Date())+'.json',JSON.stringify(S,null,2),'application/json');S={...defaults(),...x};migrate(S);lastS=S;save();dlg.close();render()};dlg.showModal()}).catch(()=>alert('That file could not be read.'))};
+
+/* ---------- Version & privacy ---------- */
+const NOTES=['Planner: date-specific drag and drop, undo, per-term timetables, relief teacher PDF','Student profiles: 12-tab central profile, whole-class overview, filtered export','Assessment centre: rubric builder, weighted policies, score/checklist/observation marking, gradebook sync','Classroom board: planner-linked display, tools (random student, groups, noise, dice, chance, angle game, complete the word)','Reporting: evidence-backed comment builder, tracker, class report pack','Curriculum: ACARA V9 code picker, coverage map, planner-driven status updates','Resource studio: validated maths worksheets with answer keys, handwriting, spelling, quick writes','Schema version, migration and validated restore','New “Biro” interface: same sections, new look (biro blue, red margin rule, highlighter-yellow “now” marker). Switch back under Settings › appearance.','Slim or regular sidebar (Settings › ATLAS appearance), quiet planner cards, saved-status pill','Today view on the dashboard with Start lesson, student flags (rule-based), keyboard marking mode, board presets'];
+stPages['Version & privacy']=()=>{const x=ext(),st=studio();
+ return card('The Teacher Hub',`<p><b>Version ${APP_VERSION}</b> · data schema ${SCHEMA} · stored schema ${e(String(x.schemaVersion||'—'))}</p><p>Last backup: ${e(x.backupDate||'not recorded')} ${!x.backupDate||Date.now()-dateObj(x.backupDate).getTime()>14*864e5?'<span class="notice">Back up now.</span>':''}</p><div class="row">${stBtn('Export complete backup','backup()',true)}${stBtn('Backup & recovery',"stView='';settings='Data & backup';go('Info & Settings')")}</div>`)+
+ card('Your data',`<p>${S.students.length} students · ${st.assessments.length} assessments · ${st.rubrics.length} rubrics · ${Object.keys(x.planner?.dates||{}).length} planner dates with changes</p><p>${(x.migrationLog||[]).length?'Migrations: '+x.migrationLog.map(m=>`${e(m.date)} schema ${m.from}→${m.to}`).join(', '):'No migrations recorded.'}</p><p>Migration only adds missing structure. It never deletes records.</p>`)+
+ card('Privacy and security',`<ul><li>Your workspace is private to your verified account. Only you can read or write it.</li><li>The classroom board never shows scores, notes or profile data.</li><li>Exports and printed profiles contain student information. Store them only in school-approved places.</li><li>No passwords or private keys are stored in this app.</li><li>Student data is not sent to AI services. Report comments and worksheets are built from your own wording.</li></ul>`)+
+ card('What’s in this version',`<ul>${NOTES.map(n=>`<li>${e(n)}</li>`).join('')}</ul>`)};
+})();
+
+</script>
+<script id="mod-ui">
+/* ATLAS 3 · "Exercise book" interface layer
+   Pure presentation: same sections, same DOM, same behaviour. Remove this module and the app is the ATLAS 2.4 look.
+   Identity: biro-blue ink, the red margin rule down the page, highlighter yellow for "now".
+   Existing themes keep working: this layer reads --bg/--panel/--ink/--accent/--line/--soft/--rail from the active theme. */
+(function(){
+'use strict';
+/* new default theme, added to the theme gallery */
+if(typeof hubThemes!=='undefined'&&!hubThemes.some(t=>t[0]==='Biro'))hubThemes.unshift(['Biro','Biro blue, red margin, highlighter yellow','#f3f4f8','#ffffff','#171c3a','#5b6385','#2336c9','#dadceb','#e8ebf8','#131833','#e9ecfa','#ffd84d']);
+try{if(S.theme==='Botanical'&&!ext().uiTheme3){ext().uiTheme3=1;S.theme='Biro'}}catch(x){}
+document.body.classList.add('hub3');
+const css=document.createElement('style');css.id='hub3-css';css.textContent=`
+body[data-theme="Biro"]{--bg:#f3f4f8;--panel:#fff;--ink:#171c3a;--muted:#5b6385;--accent:#2336c9;--line:#dadceb;--soft:#e8ebf8;--rail:#131833;--railText:#e9ecfa;--trim:#ffd84d}
+body.hub3{--margin:#f0646e;--hl:#ffd84d;--hl-soft:#fff4bf;--r-ctl:9px;--r-card:14px;--font:"Avenir Next","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-family:var(--font);font-size:15px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+body.hub3 button,body.hub3 input,body.hub3 select,body.hub3 textarea{font-family:inherit}
+body.hub3 h1,body.hub3 h2,body.hub3 h3{font-family:var(--font);letter-spacing:-.015em;color:var(--ink)}
+body.hub3 #app h1{font-size:clamp(24px,2.4vw,32px);font-weight:700;line-height:1.15}
+body.hub3 #app h2{font-size:17px;font-weight:650}
+body.hub3 .muted,body.hub3 small{color:var(--muted)}
+body.hub3 time,body.hub3 .a2-timeline span,body.hub3 .atlas-time,body.hub3 table td,body.hub3 .pl-lesson small{font-variant-numeric:tabular-nums}
+
+/* sidebar */
+body.hub3 aside{background:var(--rail);color:var(--railText)}
+body.hub3 .brandmark{background:var(--hl);color:#171c3a;border-radius:11px}
+body.hub3 .brandcopy>span{font-weight:700;letter-spacing:-.01em}
+body.hub3 #nav .v11-group>summary{border-radius:10px;font-weight:600;font-size:14px;color:var(--railText);background:transparent;padding:10px 12px}
+body.hub3 #nav .v11-group>summary:hover{background:rgba(255,255,255,.07)}
+body.hub3 #nav .v11-group.current>summary,body.hub3 #nav .v11-group[open].current>summary{background:rgba(255,255,255,.10);color:#fff;box-shadow:inset 3px 0 0 var(--hl)}
+body.hub3 #nav .v11-menu button{border-radius:8px;font-size:13px;color:color-mix(in srgb,var(--railText) 82%,transparent);background:transparent}
+body.hub3 #nav .v11-menu button:hover{background:rgba(255,255,255,.07);color:#fff}
+body.hub3 #nav .v11-menu button.v11-selected{background:var(--hl);color:#171c3a;font-weight:650}
+body.hub3 aside button:focus-visible,body.hub3 aside summary:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
+
+/* page: the margin rule */
+body.hub3 main{background:var(--bg)}
+body.hub3 #app{position:relative}
+body.hub3 #app::before{content:"";position:absolute;left:-18px;top:0;bottom:0;width:2px;background:var(--margin);opacity:.38;border-radius:2px;pointer-events:none}
+body.hub3.board #app::before{display:none}
+
+/* top bar */
+body.hub3 .atlas-bar{max-width:100%;overflow-x:auto;scrollbar-width:none;display:flex;flex-wrap:nowrap;white-space:nowrap;align-items:center;gap:6px;padding:10px 0 14px;border-bottom:1px solid var(--line);margin-bottom:18px}
+body.hub3 .atlas-path{text-transform:none!important;letter-spacing:0!important;white-space:nowrap;font-weight:600;color:var(--muted);margin-right:auto;font-size:13px}
+body.hub3 .atlas-bar button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:7px 10px;border-radius:var(--r-ctl);box-shadow:none}
+body.hub3 .atlas-bar button:hover{background:var(--soft);color:var(--ink)}
+body.hub3 #atlasSearch{order:-1;flex:0 1 320px;text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 14px}
+body.hub3 #atlasSearch::before{content:"⌕  "}
+body.hub3 .atlas-bar #a2Save{color:var(--muted);font-size:12px}
+
+/* controls */
+body.hub3 main button,body.hub3 dialog button{border-radius:var(--r-ctl);border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;font-size:13px;padding:8px 12px;box-shadow:none;transition:background .12s,border-color .12s}
+body.hub3 main button:hover:not(:disabled),body.hub3 dialog button:hover:not(:disabled){background:var(--soft);border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+body.hub3 main button.primary,body.hub3 dialog button.primary,body.hub3 main button[aria-selected="true"],body.hub3 dialog button[type=submit]{background:var(--accent);border-color:var(--accent);color:#fff}
+body.hub3 main button.primary:hover:not(:disabled),body.hub3 dialog button.primary:hover:not(:disabled),body.hub3 dialog button[type=submit]:hover{background:color-mix(in srgb,var(--accent) 88%,#000);color:#fff}
+body.hub3 button:disabled{opacity:.45;cursor:not-allowed}
+body.hub3 :is(button,a,input,select,textarea,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body.hub3 input:not([type=checkbox]):not([type=radio]),body.hub3 select,body.hub3 textarea{border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--panel);color:var(--ink);padding:8px 10px;font-size:14px}
+body.hub3 input:focus,body.hub3 select:focus,body.hub3 textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+body.hub3 .field,body.hub3 label.field{font-weight:600;font-size:13px;color:var(--ink)}
+
+/* cards, tables, dialogs */
+body.hub3 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:none;padding:18px}
+body.hub3 .card h2,body.hub3 .card h3{margin-top:0}
+body.hub3 table{border-collapse:separate;border-spacing:0;width:100%}
+body.hub3 table th{font-size:12px;font-weight:650;color:var(--muted);text-align:left;background:transparent;border-bottom:2px solid var(--line);padding:8px 10px;text-transform:none;letter-spacing:0}
+body.hub3 table td,body.hub3 table th[scope=row]{padding:9px 10px;border-bottom:1px solid var(--line)}
+body.hub3 table tr:hover td{background:color-mix(in srgb,var(--soft) 55%,transparent)}
+body.hub3 dialog{border:0;border-radius:18px;box-shadow:0 24px 60px rgba(19,24,51,.28);background:var(--panel);color:var(--ink)}
+body.hub3 dialog::backdrop{background:rgba(19,24,51,.45)}
+body.hub3 .pill{background:var(--hl-soft);color:#5b4a00;border:0;border-radius:99px;font-weight:600;padding:3px 10px}
+body.hub3 .notice{background:var(--hl-soft);border:1px solid #f1dc7a;border-radius:var(--r-ctl);color:#4f4200}
+body.hub3 .eyebrow,body.hub3 .atlas-launch small{text-transform:none!important;letter-spacing:0!important;font-weight:600;color:var(--muted);font-size:13px}
+
+/* dashboard */
+body.hub3 .hero{align-items:flex-start;gap:16px}
+body.hub3 .hero h2{font-size:15px;font-weight:500;color:var(--muted);margin:4px 0 8px}
+body.hub3 .hero-date{background:transparent;border:0;border-left:3px solid var(--margin);border-radius:0;padding:2px 0 2px 14px;text-align:left}
+body.hub3 .hero-date strong{display:block;font-size:20px;color:var(--ink)}
+body.hub3 .atlas-launch{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-card);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:none;position:relative;overflow:hidden}
+body.hub3 .atlas-launch::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--hl)}
+body.hub3 .atlas-launch h2{color:var(--ink);font-size:20px;margin:0 0 4px}
+body.hub3 .atlas-launch p{color:var(--muted);margin:0}
+body.hub3 .atlas-launch button{background:var(--soft);color:var(--ink);border-color:transparent}
+body.hub3 .atlas-launch button:first-child{background:var(--accent);color:#fff}
+body.hub3 .atlas-time{font-size:34px;font-weight:700;color:var(--accent);letter-spacing:-.02em;text-align:right}
+body.hub3 .a2-sectionhead h2{font-size:16px}
+body.hub3 .a2-widget{padding:16px 18px}
+body.hub3 .a2-timeline{display:grid;gap:0}
+body.hub3 .a2-timeline button{display:grid;grid-template-columns:104px 1fr auto;align-items:center;gap:10px;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:11px 8px 11px 12px;position:relative}
+body.hub3 .a2-timeline button span{color:var(--muted);font-size:13px}
+body.hub3 .a2-timeline button strong{font-size:15px;font-weight:650}
+body.hub3 .a2-timeline button:hover{background:var(--soft)}
+body.hub3 .a2-timeline button.a2-current{background:var(--hl-soft);box-shadow:inset 5px 0 0 var(--hl);border-radius:8px;border-bottom-color:transparent}
+body.hub3 .a2-timeline button.a2-current::after{content:"Now";font-size:12px;font-weight:700;background:var(--hl);color:#171c3a;border-radius:99px;padding:2px 10px}
+
+/* planner */
+body.hub3 .st-toolbar,body.hub3 .pl-toolbar{gap:6px}
+body.hub3 .pl-heading h1{margin:0}
+body.hub3 .pl-week{gap:10px}
+body.hub3 .pl-day{background:transparent;border:0;padding:0}
+body.hub3 .pl-day-head{background:transparent!important;color:var(--ink)!important;border:0;border-bottom:2px solid var(--line);border-radius:0;padding:6px 4px 8px;display:flex;align-items:baseline;gap:8px;color:var(--ink)}
+body.hub3 .pl-day-head span{color:var(--muted);font-weight:600;font-size:13px}
+body.hub3 .pl-day-head strong{font-size:15px}
+body.hub3 .pl-day-head.today,body.hub3 .pl-day.today .pl-day-head{background:var(--hl-soft)!important;border-bottom-color:var(--hl);box-shadow:0 3px 0 var(--hl)}
+body.hub3 .pl-day-actions{margin-left:auto;display:flex;gap:4px}
+body.hub3 .pl-day-actions button,body.hub3 .pl-day-head .pl-relief-pdf{padding:3px 8px!important;font-size:11px!important;font-weight:650;color:var(--muted)}
+body.hub3 .pl-day-body{display:grid;gap:8px;padding-top:10px}
+body.hub3 .pl-lesson{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;background:color-mix(in srgb,var(--lesson-colour,#ccc) 16%,var(--panel));border:1px solid color-mix(in srgb,var(--lesson-colour,#ccc) 45%,var(--line));border-left:6px solid var(--lesson-colour,#ccc);border-radius:11px;padding:0 8px 8px 0;overflow:hidden}
+body.hub3 .pl-lesson .pl-lesson-head{flex:1 1 100%;display:flex;justify-content:space-between;align-items:flex-start;background:transparent!important;color:var(--ink)!important;border:0;border-radius:0;padding:10px 10px 4px 12px;text-align:left}
+body.hub3 .pl-lesson .pl-lesson-head strong{font-size:14px}
+body.hub3 .pl-lesson .pl-lesson-head small{display:block;color:var(--muted);font-weight:500}
+body.hub3 .pl-lesson .st-meta{display:contents}
+body.hub3 .pl-lesson>button:not(.pl-lesson-head),body.hub3 .pl-lesson .st-meta button{font-size:11px;padding:3px 8px;margin-left:10px;background:color-mix(in srgb,var(--panel) 80%,transparent);color:var(--muted)}
+body.hub3 .pl-lesson .st-drag-grip{color:var(--muted);cursor:grab}
+
+body.hub3 table th>button{border:0!important;background:transparent!important;padding:0!important;color:var(--accent)!important;font-weight:650;font-size:13px;text-align:left;box-shadow:none!important}
+body.hub3 table thead th>button,body.hub3 table tr:first-child th>button{color:var(--muted)!important;font-size:12px}
+/* misc surfaces */
+body.hub3 .scroll{border:1px solid var(--line);border-radius:var(--r-card);background:var(--panel);padding:2px 6px}
+body.hub3 .as-tabs button.on,body.hub3 .sp-tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+body.hub3 .rp-prog,body.hub3 .cv-bar{background:var(--soft)}
+body.hub3 .rp-prog i,body.hub3 .cv-bar i{background:var(--accent)}
+
+
+/* ATLAS 2.4 shell uses !important under body.cloudReady: re-point its variables and match its specificity */
+body.hub3.cloudReady:not(.board){--atlas-rail:var(--rail);--atlas-text:var(--railText);--atlas-muted:color-mix(in srgb,var(--railText) 62%,transparent);--atlas-accent:var(--hl)}
+body.hub3.cloudReady:not(.board) #nav .v11-group.current>summary{background:rgba(255,255,255,.11)!important;color:#fff!important;box-shadow:inset 3px 0 0 var(--hl)}
+body.hub3.cloudReady:not(.board) #nav .v11-group[open]:not(.current)>summary{background:rgba(255,255,255,.05)!important}
+body.hub3.cloudReady:not(.board) #nav .v11-group>summary{font-size:14px!important;border-radius:10px!important}
+body.hub3.cloudReady:not(.board) #nav .v11-menu{background:transparent!important;padding:2px 0 6px 12px!important}
+body.hub3.cloudReady:not(.board) #nav .v11-menu button{color:color-mix(in srgb,var(--railText) 80%,transparent)!important;font-size:13px!important;border-radius:8px!important}
+body.hub3.cloudReady:not(.board) #nav .v11-menu button.v11-selected{background:var(--hl)!important;color:#171c3a!important;font-weight:650}
+body.hub3.cloudReady:not(.board)>aside .header-actions button{background:rgba(255,255,255,.09)!important;border:0!important;border-radius:8px!important}
+body.hub3.cloudReady:not(.board) #app .hero-date{background:transparent!important}
+body.hub3.cloudReady:not(.board) #app h1{letter-spacing:-.02em;font-size:clamp(24px,2.4vw,32px)}
+body.hub3.cloudReady:not(.board) #app h2{letter-spacing:-.01em;font-size:17px}
+body.hub3.cloudReady:not(.board) #app .card{border-radius:var(--r-card)}
+
+/* mobile */
+@media(max-width:900px){body.hub3 #app::before{display:none}body.hub3 .atlas-bar{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin}body.hub3 .atlas-bar button{white-space:nowrap}body.hub3 #atlasSearch{flex:0 0 auto}body.hub3 .atlas-launch{flex-direction:column;align-items:flex-start}body.hub3 .atlas-time{text-align:left}}
+@media(prefers-reduced-motion:reduce){body.hub3 *{transition:none!important}}
+`;
+document.head.appendChild(css);
+const sub=document.querySelector('.brandcopy small');if(sub)sub.textContent='Classroom workspace';
+const _r=render;render=function(){try{if(S.theme==='Botanical'&&!ext().uiTheme3){ext().uiTheme3=1;S.theme='Biro';save()}}catch(x){}_r();document.body.dataset.theme=S.theme;const ap=document.querySelector('.atlas-path');if(ap)ap.textContent=ap.textContent.replace(/^Atlas \/ /i,'');const ls=document.querySelector('.atlas-launch small');if(ls)ls.textContent='Today';document.body.classList.add('hub3');const t=document.querySelector('.pl-day-head');
+ const td=dateISO(new Date());document.querySelectorAll('.pl-day').forEach(d=>d.classList.toggle('today',d.dataset.stDrop===td))};
+})();
+
+</script>
+<script id="mod-shell">
+/* ATLAS 3 · shell: tidy sidebar, slim/regular sidebar setting, quiet planner cards, honest save status */
+(function(){
+'use strict';
+const ui=()=>{const x=ext();x.ui??={sidebar:'regular'};return x.ui};
+const el=id=>document.getElementById(id);
+const css=document.createElement('style');css.id='hub3-shell-css';css.textContent=`
+/* ---------- sidebar: brand, nav, footer ---------- */
+body.hub3.cloudReady:not(.board)>aside{padding:16px 12px 12px!important;gap:0!important}
+body.hub3 aside .brand{padding:2px 4px 14px!important;gap:10px!important}
+body.hub3 aside .brandmark{width:34px;height:34px;flex:0 0 34px;border-radius:10px;display:grid;place-items:center}
+body.hub3 aside .brandmark svg{width:20px;height:20px}
+body.hub3 aside .brandcopy{display:grid;line-height:1.15}
+body.hub3 aside .brandcopy #hubBrandName{font-size:15px;font-weight:700;letter-spacing:-.01em}
+body.hub3 aside .brandcopy small{font-size:11px;letter-spacing:0;font-weight:500;color:color-mix(in srgb,var(--railText) 58%,transparent)}
+body.hub3.cloudReady:not(.board)>aside>#nav{flex:1 1 auto!important;overflow-y:auto!important;min-height:0;scrollbar-width:thin;padding-right:2px}
+body.hub3 aside .railfoot{order:3;margin:8px 0 6px!important;padding:8px 6px 0;border-top:1px solid rgba(255,255,255,.09);display:block!important}
+body.hub3 aside .railfoot #saveStatus{display:none}
+body.hub3 aside .railfoot #sideYear{display:block;font-size:12px;color:color-mix(in srgb,var(--railText) 62%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.hub3 aside .header-actions{order:4;display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:6px!important}
+body.hub3.cloudReady:not(.board)>aside .header-actions button{min-width:0;padding:8px 4px!important;font-size:12px!important;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.07)!important;color:var(--railText)!important}
+body.hub3.cloudReady:not(.board)>aside .header-actions button:hover{background:rgba(255,255,255,.14)!important}
+body.hub3 #shellCollapse{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px}
+@media(max-width:900px){body.hub3 #shellCollapse{display:none!important}}
+
+/* ---------- slim sidebar ---------- */
+@media(min-width:901px){
+body.hub3.ui-slim.cloudReady:not(.board)>aside{width:68px!important;overflow:hidden!important;transition:width .16s ease,box-shadow .16s ease;z-index:60}
+body.hub3.ui-slim.cloudReady:not(.board)>main{margin-left:68px!important;width:calc(100% - 68px)!important}
+body.hub3.ui-slim.cloudReady:not(.board)>aside:is(:hover,:focus-within){width:244px!important;box-shadow:12px 0 40px rgba(10,14,40,.35)}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) :is(.brandcopy,.railfoot,.v11-menu){display:none!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) #nav .v11-group>summary{font-size:0!important;justify-content:center;padding:11px 0!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) #nav .v11-group>summary::after{display:none!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) #nav .v11-group>summary>span{font-size:18px!important;width:auto!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) .header-actions{grid-template-columns:1fr!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) .header-actions button{font-size:0!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) .header-actions button:first-child{display:none!important}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) .header-actions button::first-letter{font-size:16px}
+body.hub3.ui-slim>aside:not(:hover):not(:focus-within) .brand{justify-content:center}
+}
+
+/* ---------- dashboard shortcuts: one calm row ---------- */
+body.hub3 .quicklinks{display:flex!important;flex-wrap:wrap;gap:8px!important;margin:0 0 16px!important}
+body.hub3 .quicklinks button{flex-direction:row!important;min-height:0!important;padding:8px 12px!important;gap:8px!important;font-size:13px!important;text-transform:none!important;letter-spacing:0!important;font-weight:600;border-radius:99px!important;width:auto!important}
+body.hub3 .quicklinks svg{width:18px!important;height:18px!important}
+body.hub3 .pl-lesson a{color:var(--accent);font-size:12px;font-weight:600}
+/* ---------- quiet planner cards: controls appear on hover / focus ---------- */
+body.hub3 .pl-lesson{position:relative;padding-bottom:0!important}
+body.hub3 .pl-lesson .pl-lesson-head{padding-bottom:10px}
+@media(hover:hover){
+body.hub3 .pl-lesson>button:not(.pl-lesson-head),body.hub3 .pl-lesson .st-meta button{position:absolute;right:6px;bottom:6px;margin:0!important;opacity:0;pointer-events:none;transition:opacity .12s}
+body.hub3 .pl-lesson>button:not(.pl-lesson-head){right:6px}
+body.hub3 .pl-lesson .st-meta button{right:70px}
+body.hub3 .pl-lesson:is(:hover,:focus-within)>button:not(.pl-lesson-head),body.hub3 .pl-lesson:is(:hover,:focus-within) .st-meta button{opacity:1;pointer-events:auto}
+body.hub3 .pl-lesson .st-drag-grip{opacity:.35}
+body.hub3 .pl-lesson:is(:hover,:focus-within) .st-drag-grip{opacity:1}
+}
+@media(hover:none){body.hub3 .pl-lesson{padding-bottom:8px!important}}
+
+/* ---------- save status pill ---------- */
+#savePill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--muted);padding:6px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+#savePill i{width:8px;height:8px;border-radius:50%;background:#2e9d66}
+#savePill[data-state=saving] i{background:#e0a800;animation:pulse 1s infinite}
+#savePill[data-state=error] i{background:#d33}
+#savePill[data-state=error]{color:#a11;border-color:#e9b3b3;background:#fff1f1}
+@keyframes pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){#savePill i{animation:none!important}}
+body.hub3 .atlas-bar #a2Save{display:none}
+`;document.head.appendChild(css);
+
+/* ---------- sidebar mode ---------- */
+function applyMode(){document.body.classList.toggle('ui-slim',ui().sidebar==='slim')}
+window.shellSidebar=m=>{ui().sidebar=m==='slim'?'slim':'regular';save();applyMode();paintCollapse()};
+function paintCollapse(){const a=document.querySelector('aside .header-actions');if(!a)return;let b=el('shellCollapse');if(!b){b=document.createElement('button');b.id='shellCollapse';b.type='button';b.onclick=()=>shellSidebar(ui().sidebar==='slim'?'regular':'slim');a.appendChild(b)}
+ b.textContent=ui().sidebar==='slim'?'⇥ Keep open':'⇤ Slim sidebar';b.setAttribute('aria-pressed',ui().sidebar==='slim')}
+const _ap=stPages['ATLAS appearance & recovery'];
+stPages['ATLAS appearance & recovery']=()=>card('Sidebar',`<label class="field">Sidebar style<select onchange="shellSidebar(this.value);render()"><option value="regular" ${ui().sidebar!=='slim'?'selected':''}>Regular: icons and labels</option><option value="slim" ${ui().sidebar==='slim'?'selected':''}>Slim: icons only, opens when you hover</option></select></label><p class="muted">Slim gives the planner and tables about 180px more room. Hover or tab into the sidebar to open it.</p>`)+_ap();
+
+/* ---------- save status ---------- */
+let pill=null,last=null,state='saved',lastText='';
+const fmtT=d=>d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'});
+function drawPill(){if(!pill)return;const cloud=!!window.hubAccount;pill.dataset.state=state;
+ const where=cloud?'':' on this device';
+ pill.querySelector('b').textContent=state==='saving'?'Saving…':state==='error'?(lastText||'Not saved'):('Saved'+where+(last?' · '+fmtT(last):''))}
+function ensurePill(){const bar=document.getElementById('atlasBar');if(!bar)return;if(!pill||!pill.isConnected){pill=document.createElement('span');pill.id='savePill';pill.setAttribute('role','status');pill.setAttribute('aria-live','polite');pill.innerHTML='<i></i><b></b>';bar.appendChild(pill)}drawPill()}
+let timer=null;const _save=save;
+save=function(){state='saving';drawPill();const r=_save.apply(this,arguments);clearTimeout(timer);timer=setTimeout(()=>{if(!window.hubAccount){state='saved';last=new Date();drawPill()}else if(state==='saving'&&!(el('saveStatus')&&/saving|queued|pending/i.test(el('saveStatus').textContent))){state='saved';last=new Date();drawPill()}},500);return r};
+/* cloud mode: the cloud code writes its own status into #saveStatus; mirror it, never invent it */
+function watchCloud(){const s=el('saveStatus');if(!s||s.dataset.watched)return;s.dataset.watched=1;new MutationObserver(()=>{const t=s.textContent.trim();lastText=t;
+  if(/error|fail|offline|not saved|conflict|blocked/i.test(t))state='error';else if(/saving|queued|pending|syncing/i.test(t))state='saving';else if(/saved|synced|cloud/i.test(t)){state='saved';last=new Date()}drawPill()}).observe(s,{childList:true,characterData:true,subtree:true})}
+addEventListener('beforeunload',ev=>{if(state==='saving'&&window.hubAccount){ev.preventDefault();ev.returnValue=''}});
+const _r=render;render=function(){_r();applyMode();paintCollapse();watchCloud();ensurePill()};
+})();
+
+</script>
+<script id="mod-today">
+/* ATLAS 3 · Today view + student flags
+   Today: current / next lesson from the planner with LI, SC and links, a "Start lesson" button that sets the board from the lesson and starts the timer.
+   Flags: rule-based and explainable, from your own records. Nothing is inferred or scored.
+     - missing recent assessments (class assessed, this student has no result; Exempt is ignored)
+     - DIBELS score missing for the period YOU choose (off until you choose one)
+     - follow-up actions past their due date */
+(function(){
+'use strict';
+const el=id=>document.getElementById(id);
+const cfg=()=>{const x=ext();x.flags??={days:21,dibelsPeriod:'',on:{missing:true,dibels:true,overdue:true},snooze:{}};x.flags.on??={missing:true,dibels:true,overdue:true};x.flags.snooze??={};return x.flags};
+const hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+const toMin=t=>{const [h,m]=String(t).split(':').map(Number);return h*60+m};
+const tl=t=>{try{return plTime(t)}catch(x){return t}};
+const SKIP=/^(recess|lunch)$/i;
+
+/* ---------- lessons ---------- */
+function dayState(){const d=new Date(),ds=dateISO(d),info=schoolDay(d);if(info.kind!=='School day')return{ds,kind:'off',info,rows:[]};
+ const rows=plRows(ds),now=hm(d),teach=rows.filter(r=>!SKIP.test(r.subject));
+ const cur=rows.find(r=>r.start<=now&&now<r.end&&!SKIP.test(r.subject))||null;
+ const brk=rows.find(r=>r.start<=now&&now<r.end&&SKIP.test(r.subject))||null;
+ const next=teach.find(r=>r.start>now&&r!==cur)||null;
+ return{ds,kind:cur?'now':brk?'break':next?'before':'after',cur,brk,next,rows,teach,info,now,d}}
+function mins(r,d){return toMin(r.end)-(d.getHours()*60+d.getMinutes())}
+function links(l){return String(l.links||'').split('\n').map(x=>x.trim()).filter(x=>/^https:\/\//i.test(x)).slice(0,4)}
+const linkLabel=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(x){return u}};
+
+window.tdStart=(ds,id)=>{const rows=plRows(ds),i=rows.findIndex(r=>r.id===id),l=rows[i];if(!l)return;
+ const teach=rows.filter(r=>!SKIP.test(r.subject)),nx=teach.find(r=>r.start>l.start);
+ const n=new Date(),len=toMin(l.end)-toMin(l.start),left=toMin(l.end)-(n.getHours()*60+n.getMinutes()),m=Math.max(1,Math.min(180,(left>0&&left<=len)?left:len));
+ const b=studio().board;Object.assign(b,{intention:l.li||'',criteria:l.sc||'',task:l.independent||l.focus||'',next:nx?(nx.name||nx.subject):'',minutes:m});
+ save();if(typeof stResetTimer==='function')stResetTimer();if(!board)toggleBoard();setTimeout(()=>{if(typeof stStartTimer==='function')stStartTimer()},50)};
+
+function todayHTML(){const s=dayState(),f=flags();
+ const lessonBlock=(l,label)=>{const L=links(l);return `<div class="td-lesson"><div class="td-tag td-${label.toLowerCase()}">${label}</div><h2>${e(l.name||l.subject)}</h2><div class="td-time">${e(tl(l.start))} – ${e(tl(l.end))}${label==='Now'?` · <b>${Math.max(0,mins(l,s.d))} min left</b>`:''}</div>
+  ${l.li?`<p><b>Learning intention</b> ${e(l.li)}</p>`:'<p class="muted">No learning intention yet.</p>'}${l.sc?`<p><b>Success criteria</b> ${e(l.sc)}</p>`:''}${L.length?`<p class="td-links">${L.map(u=>`<a href="${e(u)}" target="_blank" rel="noopener noreferrer">${e(linkLabel(u))}</a>`).join('')}</p>`:''}
+  <div class="row"><button type="button" class="primary" onclick="tdStart(${J(s.ds)},${J(l.id)})">Start lesson</button><button type="button" onclick="plOpen(${J(s.ds)},${J(l.id)})">Open lesson</button></div></div>`};
+ let left;
+ if(s.kind==='off')left=`<div class="td-lesson"><div class="td-tag">Today</div><h2>${e(s.info.kind)}</h2><p class="muted">Next school day: ${e(nextDay(new Date()))}</p><div class="row"><button type="button" class="primary" onclick="stPlanner('week')">Open planner</button></div></div>`;
+ else if(s.kind==='now')left=lessonBlock(s.cur,'Now');
+ else if(s.kind==='break')left=`<div class="td-lesson"><div class="td-tag td-break">${e(s.brk.subject)}</div><h2>${s.next?'Next: '+e(s.next.name||s.next.subject):'Last lesson of the day is done'}</h2><div class="td-time">${s.next?e(tl(s.next.start))+' – '+e(tl(s.next.end)):''}</div>${s.next?`<div class="row"><button type="button" class="primary" onclick="tdStart(${J(s.ds)},${J(s.next.id)})">Start lesson</button><button type="button" onclick="plOpen(${J(s.ds)},${J(s.next.id)})">Open lesson</button></div>`:''}</div>`;
+ else if(s.kind==='before')left=lessonBlock(s.next,'Next');
+ else left=`<div class="td-lesson"><div class="td-tag">Today</div><h2>Lessons are finished</h2><p class="muted">Tomorrow's first school day: ${e(nextDay(new Date()))}</p><div class="row"><button type="button" class="primary" onclick="stPlanner('week')">Plan the week</button><button type="button" onclick="stGo('Reporting tracker')">Reports</button></div></div>`;
+ const up=s.teach?s.teach.filter(r=>r.start>(s.now||'00:00')&&r!==s.cur&&r!==s.next).slice(0,3):[];
+ const right=`<div class="td-side">${(s.kind==='now'&&s.next)?`<div class="td-up"><span>Up next</span><button type="button" onclick="plOpen(${J(s.ds)},${J(s.next.id)})"><b>${e(s.next.name||s.next.subject)}</b> <small>${e(tl(s.next.start))}</small></button></div>`:''}${up.length?`<div class="td-up"><span>Later today</span>${up.map(r=>`<button type="button" onclick="plOpen(${J(s.ds)},${J(r.id)})"><b>${e(r.name||r.subject)}</b> <small>${e(tl(r.start))}</small></button>`).join('')}</div>`:''}
+  <div class="td-up"><span>Needs attention ${f.length?`(${f.length})`:''}</span>${f.length?f.slice(0,3).map(x=>`<button type="button" onclick="stStudent=${J(x.sid)};stGo('Student flags')"><b>${e(x.name)}</b> <small>${e(x.text)}</small></button>`).join('')+(f.length>3?`<button type="button" onclick="stGo('Student flags')">See all ${f.length}</button>`:''):'<small class="muted">Nothing flagged.</small>'}</div></div>`;
+ return `<div class="td-grid">${left}${right}</div>`}
+
+/* ---------- flags ---------- */
+const today=()=>dateISO(new Date());
+function flags(){const c=cfg(),out=[],t=today(),snz=c.snooze;
+ const names=Object.fromEntries(S.students.map(s=>[s.id,s.name]));
+ if(c.on.missing){const from=new Date();from.setDate(from.getDate()-c.days);const f=dateISO(from);
+  for(const [sub,list] of Object.entries(S.assignments||{}))for(const a of list||[]){if(!a.date||a.date<f||a.date>t)continue;
+   const done=S.students.filter(s=>{const g=(a.results||{})[s.id];return g&&((g.percent!==''&&g.percent!=null)||(g.grade!==''&&g.grade!=null))}).length;if(done*2<S.students.length)continue;
+   for(const s of S.students){const g=(a.results||{})[s.id]||{};if(g.status==='Exempt')continue;const has=(g.percent!==''&&g.percent!=null)||(g.grade!==''&&g.grade!=null);if(!has)out.push({sid:s.id,name:s.name,kind:'missing',key:'m:'+s.id+':'+a.id,text:(g.status==='Absent'?'Absent for ':'No result for ')+a.name,detail:sub+' · '+a.date})}}}
+ if(c.on.dibels&&c.dibelsPeriod!==''){const p=+c.dibelsPeriod;for(const s of S.students){const r=(db().scores[s.id]||{})[p];const has=r&&Object.values(r).some(v=>v!==''&&v!=null);if(!has)out.push({sid:s.id,name:s.name,kind:'dibels',key:'d:'+s.id+':'+p,text:'No DIBELS score for '+dbPeriods[p],detail:'Reading'})}}
+ if(c.on.overdue)for(const s of S.students){for(const r of (a2profile(s.id).records||[])){if(r.status!=='Complete'&&r.due&&r.due<t)out.push({sid:s.id,name:s.name,kind:'overdue',key:'o:'+s.id+':'+r.id,text:'Overdue: '+String(r.text||r.type).slice(0,60),detail:'Due '+r.due,rid:r.id})}}
+ return out.filter(x=>!(snz[x.key]&&snz[x.key]>=t)).sort((a,b)=>a.name.localeCompare(b.name))}
+window.studentFlags=flags;
+window.tdSnooze=(key,days)=>{const d=new Date();d.setDate(d.getDate()+days);cfg().snooze[key]=dateISO(d);save();render()};
+window.tdFlagCfg=(k,v)=>{const c=cfg();if(k==='days')c.days=Math.max(1,Math.min(120,Math.floor(+v)||21));else if(k==='period')c.dibelsPeriod=v;else c.on[k]=!!v;save();render()};
+stPages['Student flags']=()=>{const c=cfg(),f=flags();
+ return card('How flags work',`<p class="muted">Flags come only from the records you keep. They are prompts, not judgements, and nothing here changes a result.</p>
+ <div class="row"><label>Look back <input type="number" min="1" max="120" value="${c.days}" style="width:70px" onchange="tdFlagCfg('days',this.value)"> days</label>
+ <label><input type="checkbox" ${c.on.missing?'checked':''} onchange="tdFlagCfg('missing',this.checked)"> Missing assessments</label>
+ <label><input type="checkbox" ${c.on.overdue?'checked':''} onchange="tdFlagCfg('overdue',this.checked)"> Overdue follow-ups</label>
+ <label><input type="checkbox" ${c.on.dibels?'checked':''} onchange="tdFlagCfg('dibels',this.checked)"> DIBELS missing for</label>
+ <select aria-label="DIBELS period" onchange="tdFlagCfg('period',this.value)"><option value="">Off: choose a period</option>${dbPeriods.map((p,i)=>`<option value="${i}" ${String(c.dibelsPeriod)===String(i)?'selected':''}>${e(p)}</option>`).join('')}</select></div>`)+
+ card(`Flags (${f.length})`,f.length?`<div class="scroll"><table><tr><th>Student</th><th>Flag</th><th>Detail</th><th></th></tr>${f.map(x=>`<tr><td><button type="button" class="link" onclick="a2openProfile(${J(x.sid)})">${e(x.name)}</button></td><td>${e(x.text)}</td><td>${e(x.detail)}</td><td><button type="button" onclick="tdSnooze(${J(x.key)},7)">Snooze 7 days</button></td></tr>`).join('')}</table></div>`:'<p>No flags right now.</p>')};
+
+/* nav: add under Students */
+function navAdd(){const grp=[...document.querySelectorAll('#nav .v11-group')].find(g=>g.querySelector('summary')?.textContent.includes('Students'));const menu=grp?.querySelector('.v11-menu');if(!menu)return;
+ if(![...menu.querySelectorAll('button')].some(x=>x.textContent==='Student flags')){const proto=menu.querySelector('button');if(proto){const nb=proto.cloneNode(true);nb.removeAttribute('onclick');nb.className='';nb.textContent='Student flags';nb.addEventListener('click',()=>stGo('Student flags'));menu.appendChild(nb)}}
+ for(const x of menu.querySelectorAll('button'))if(x.textContent==='Student flags')x.onclick=()=>stGo('Student flags')}
+
+const css=document.createElement('style');css.textContent=`
+body.hub3 .atlas-launch.td{display:block;padding:0;border:1px solid var(--line)}
+body.hub3 .atlas-launch.td::before{width:6px}
+.td-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,1fr);gap:0}
+.td-lesson{padding:20px 24px 20px 28px;min-width:0}
+.td-lesson h2{font-size:24px!important;margin:6px 0 2px!important;color:var(--ink)}
+.td-lesson p{margin:6px 0;max-width:70ch;color:var(--ink)}
+.td-lesson p b{color:var(--muted);font-weight:650;margin-right:6px}
+.td-lesson .row{margin-top:12px}
+.td-time{color:var(--muted);font-variant-numeric:tabular-nums}.td-time b{color:var(--ink)}
+.td-tag{display:inline-block;font-size:12px;font-weight:700;border-radius:99px;padding:2px 10px;background:var(--soft);color:var(--muted)}
+.td-now{background:var(--hl);color:#171c3a}.td-next{background:var(--soft);color:var(--accent)}
+.td-links{display:flex;gap:8px;flex-wrap:wrap}.td-links a{font-size:13px;font-weight:600;color:var(--accent);background:var(--soft);padding:3px 10px;border-radius:99px;text-decoration:none}
+.td-side{border-left:1px solid var(--line);padding:16px 18px;display:grid;gap:14px;align-content:start;background:color-mix(in srgb,var(--soft) 40%,var(--panel))}
+.td-up{display:grid;gap:4px}.td-up>span{font-size:12px;font-weight:650;color:var(--muted)}
+.td-up button{display:flex;justify-content:space-between;align-items:baseline;gap:8px;text-align:left;border:0!important;background:transparent!important;padding:6px 8px!important;border-radius:8px}
+.td-up button:hover{background:var(--soft)!important}.td-up button small{color:var(--muted);text-align:right}
+button.link{border:0!important;background:transparent!important;padding:0!important;color:var(--accent);font-weight:650}
+@media(max-width:900px){.td-grid{grid-template-columns:1fr}.td-side{border-left:0;border-top:1px solid var(--line)}}
+`;document.head.appendChild(css);
+let tick=null;
+const _r=render;render=function(){_r();navAdd();const box=document.querySelector('#app .atlas-launch');if(box&&!board){box.classList.add('td');box.innerHTML=todayHTML();
+  clearInterval(tick);tick=setInterval(()=>{const b=document.querySelector('#app .atlas-launch.td');if(!b||board){clearInterval(tick);return}const t=b.querySelector('.td-time b');if(t&&dayState().cur)t.textContent=Math.max(0,mins(dayState().cur,new Date()))+' min left'},30000)}};
+})();
+
+</script>
+<script id="mod-markmode">
+/* ATLAS 3 · keyboard marking mode
+   One student at a time, hands on the keyboard. Uses the same marking functions as the Assessment centre
+   (asMark / asCell), so gradebook sync, blank-not-zero and policies behave identically.
+   Score:     type the mark, Enter = save and next student, Shift+Enter = back, Alt+A = Absent, Alt+E = Exempt, Esc = exit
+   Rubric:    press 1, 2, 3… to choose the level for the highlighted criterion, it moves down; the last step is the overall result
+   Checklist: 1 Achieved, 2 Developing, 3 Not yet
+   Arrow keys / Enter move between steps and students; Backspace clears the current step. */
+(function(){
+'use strict';
+const M={id:'',i:0,step:0,dlg:null};
+const el=id=>document.getElementById(id);
+const A=()=>studio().assessments.find(x=>x.id===M.id);
+const stu=()=>S.students[M.i];
+const CHECK=['Achieved','Developing','Not yet'];
+function steps(a){if(a.type==='Rubric'){const r=asRubricOf(a);return r.criteria.map((c,i)=>({key:i,label:c.name||('Criterion '+(i+1)),levels:r.scale.levels})).concat([{key:'overall',label:'Overall result',levels:r.scale.levels,overall:true}])}
+ if(a.type==='Checklist')return a.criteria.map((c,i)=>({key:i,label:c,levels:CHECK}));return[]}
+function marksOf(a){return (a.marks&&a.marks[stu().id])||{}}
+function draw(){const a=A(),s=stu();if(!a||!s||!M.dlg)return;const m=marksOf(a),st=steps(a),done=S.students.filter(x=>{const k=a.marks[x.id];return k&&Object.keys(k).length}).length;
+ let body='';
+ if(a.type==='Score'||a.type==='Diagnostic')body=`<label class="mm-score">Score out of ${a.max}<input id="mmScore" type="number" inputmode="decimal" min="0" max="${a.max}" step="any" value="${m.score??''}" ${m.status?'disabled':''} aria-label="Score for ${e(s.name)}"></label><p class="mm-status">${m.status?`Marked ${e(m.status)}. <button type="button" onclick="mmStatus('')">Undo</button>`:`<button type="button" onclick="mmStatus('Absent')">Absent (Alt+A)</button> <button type="button" onclick="mmStatus('Exempt')">Exempt (Alt+E)</button>`}</p>`;
+ else if(st.length)body=`<ol class="mm-steps">${st.map((p,n)=>`<li class="${n===M.step?'cur':''}"><button type="button" class="mm-lab" onclick="mmGoStep(${n})">${e(p.label)}</button><span class="mm-levels">${p.levels.map((l,k)=>`<button type="button" class="${m[p.key]===l?'on':''}" onclick="mmPick(${n},${k})"><kbd>${k+1}</kbd> ${e(l)}</button>`).join('')}</span></li>`).join('')}</ol>`;
+ else body='<p>This assessment type is marked from the class overview. Observations are free text, so they are not keyboard-marked.</p>';
+ M.dlg.querySelector('.mm-body').innerHTML=`<div class="mm-head"><div><small>${e(a.name)} · ${e(a.subject||'')}</small><h2>${e(s.name)}</h2></div><div class="mm-prog">${M.i+1} of ${S.students.length}<br><small>${done} marked</small></div></div>${body}<p class="mm-keys">${a.type==='Score'||a.type==='Diagnostic'?'Enter next · Shift+Enter back · Esc exit':'Number keys choose · ↑ ↓ change criterion · Enter next student · Shift+Enter back · Backspace clears · Esc exit'}</p>`;
+ const inp=el('mmScore');if(inp){inp.focus();inp.select()}}
+function commitScore(){const a=A();if(!a||(a.type!=='Score'&&a.type!=='Diagnostic'))return true;const inp=el('mmScore');if(!inp||inp.disabled)return true;const v=inp.value.trim();const m=marksOf(a);if(v===String(m.score??''))return true;
+ if(v!==''&&(!Number.isFinite(+v)||+v<0||+v>a.max)){inp.classList.add('bad');inp.setCustomValidity('Enter 0 to '+a.max);inp.reportValidity();return false}
+ asMark(a.id,stu().id,'score',v);return true}
+window.mmGo=d=>{if(!commitScore())return;const n=M.i+d;if(n<0||n>=S.students.length){if(d>0)mmClose();return}M.i=n;M.step=0;draw()};
+window.mmStatus=v=>{const a=A();asMark(a.id,stu().id,'status',v);draw()};
+window.mmGoStep=n=>{M.step=n;draw()};
+window.mmOpen=()=>{const a=studio().assessments.find(x=>x.id===stAssessment);if(!a){alert('Open an assessment first.');return}if(!S.students.length){alert('Add students first.');return}
+ M.id=a.id;M.i=0;M.step=0;const d=document.createElement('dialog');d.className='mm-dialog';d.setAttribute('aria-label','Keyboard marking');d.innerHTML='<div class="mm-top"><span>Keyboard marking</span><button type="button" id="mmExit">Exit (Esc)</button></div><div class="mm-body"></div>';document.body.append(d);M.dlg=d;
+ d.querySelector('#mmExit').onclick=()=>mmClose();d.addEventListener('cancel',ev=>{ev.preventDefault();mmClose()});d.addEventListener('keydown',onKey);d.showModal();draw()};
+window.mmClose=()=>{if(!commitScore())return;const d=M.dlg;M.dlg=null;if(d){d.close();d.remove()}render()};
+function onKey(ev){const a=A();if(!a)return;const t=ev.target;
+ if(ev.key==='Enter'){ev.preventDefault();if(a.type==='Score'||a.type==='Diagnostic'){mmGo(ev.shiftKey?-1:1)}else if(ev.shiftKey)mmGo(-1);else mmGo(1);return}
+ if(ev.altKey&&(a.type==='Score'||a.type==='Diagnostic')){if(ev.key.toLowerCase()==='a'){ev.preventDefault();commitScore()&&mmStatus('Absent')}if(ev.key.toLowerCase()==='e'){ev.preventDefault();commitScore()&&mmStatus('Exempt')}return}
+ if(a.type==='Score'||a.type==='Diagnostic')return;
+ if(/^[1-9]$/.test(ev.key)){ev.preventDefault();const n=M.step,p=steps(a)[n];if(!p)return;const k=+ev.key-1;if(k<p.levels.length){if(a.type==='Checklist')mmCheck(n,k);else mmPick(n,k)}return}
+ if(ev.key==='ArrowDown'){ev.preventDefault();M.step=Math.min(M.step+1,steps(a).length-1);draw()}
+ if(ev.key==='ArrowUp'){ev.preventDefault();M.step=Math.max(M.step-1,0);draw()}
+ if(ev.key==='Backspace'){ev.preventDefault();const p=steps(a)[M.step];if(!p)return;const cur=marksOf(a)[p.key];if(cur!==undefined&&cur!==''){if(p.overall)asMark(a.id,stu().id,'overall','');else if(a.type==='Checklist')asMark(a.id,stu().id,String(p.key),'');else asCell(a.id,stu().id,p.key,cur)}draw()}}
+/* checklist marking through the class-overview function so behaviour matches exactly */
+window.mmCheck=(n,k)=>{const a=A(),p=steps(a)[n],s=stu();if(!p)return;const lvl=p.levels[k];const cur=marksOf(a)[p.key];asMark(a.id,s.id,String(p.key),cur===lvl?'':lvl);M.step=Math.min(n+1,steps(a).length-1);draw()};
+/* rubric: asCell toggles, so remove a different existing level first */
+window.mmPick=(n,k)=>{const a=A(),p=steps(a)[n],s=stu();if(!p)return;if(a.type==='Checklist')return mmCheck(n,k);const lvl=p.levels[k];if(lvl===undefined)return;
+ if(p.overall){asMark(a.id,s.id,'overall',marksOf(a).overall===lvl?'':lvl)}
+ else{const cur=marksOf(a)[p.key];if(cur!==undefined&&cur!==''&&cur!==lvl)asCell(a.id,s.id,p.key,cur);if(cur!==lvl)asCell(a.id,s.id,p.key,lvl)}
+ M.step=Math.min(n+1,steps(a).length-1);draw()};
+
+/* entry point on the Assessment centre page */
+const _ac=stPages['Assessment centre'];
+stPages['Assessment centre']=()=>{const html=_ac();return (studio().assessments.some(x=>x.id===stAssessment&&['Score','Diagnostic','Rubric','Checklist'].includes(x.type))?`<div class="row section"><button type="button" class="primary" onclick="mmOpen()">Keyboard marking</button><small class="muted">Mark this assessment one student at a time without the mouse.</small></div>`:'')+html};
+const css=document.createElement('style');css.textContent=`
+.mm-dialog{width:min(780px,96vw);max-height:92vh;padding:0;border:0;border-radius:18px;overflow:auto}
+.mm-dialog::backdrop{background:rgba(19,24,51,.55)}
+.mm-top{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--line);font-weight:650;background:var(--soft)}
+.mm-body{padding:22px 26px}
+.mm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.mm-head h2{font-size:34px!important;margin:4px 0 0!important}.mm-prog{text-align:right;font-variant-numeric:tabular-nums;font-weight:650}
+.mm-score{display:grid;gap:8px;margin:22px 0 8px;font-weight:650}.mm-score input{font-size:44px;padding:10px 16px;width:min(280px,100%);font-variant-numeric:tabular-nums}.mm-score input.bad{border-color:#d33}
+.mm-steps{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px}
+.mm-steps li{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;border:2px solid transparent}
+.mm-steps li.cur{border-color:var(--accent);background:color-mix(in srgb,var(--soft) 60%,transparent)}
+.mm-lab{border:0!important;background:transparent!important;text-align:left;font-weight:650;padding:0!important}
+.mm-levels{display:flex;gap:6px;flex-wrap:wrap}.mm-levels button.on{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+kbd{font:inherit;font-size:11px;font-weight:700;background:rgba(0,0,0,.08);border-radius:4px;padding:0 5px;margin-right:2px}.mm-levels .on kbd{background:rgba(255,255,255,.25)}
+.mm-keys{color:var(--muted);font-size:13px;margin:18px 0 0}.mm-status{margin:6px 0}
+@media(max-width:600px){.mm-steps li{grid-template-columns:1fr}.mm-head h2{font-size:26px!important}}
+`;document.head.appendChild(css);
+})();
+
+</script>
+<script type="module">
 const loginMessage = document.getElementById('cloudMessage');
 const loginWatchdog = setTimeout(()=>{if(loginMessage.textContent.includes('Connecting'))loginMessage.textContent='Firebase is taking longer than expected. Check your connection or reload this page.';},12000);
 try {
@@ -1449,4 +2778,78 @@ el('gateLogout').onclick=()=>signOut(auth).then(()=>location.reload());
 onAuthStateChanged(auth,async u=>{const token=++epoch; if(active&&u&&user&&u.uid!==user.uid){active=false;window.hubAccount=null;document.body.classList.remove('cloudReady');location.reload();return;} if(!u){if(active){active=false;window.hubAccount=null;location.reload();return;}setMode('login');msg('Sign in to continue.');el('gateLogout').hidden=true;return;}user=u;el('gateLogout').hidden=false;if(!u.emailVerified){setMode('verify');if(!registering)msg('Check your inbox for a verification link, or request a new one.');return;}msg('Loading your private workspace…');try{const remote=await read(u.uid);if(token!==epoch)return;rev=remote.rev;let recovery=null;try{recovery=JSON.parse(localStorage.getItem(key(u.uid))||'null')}catch{};S={...defaults(),...(remote.data||{})};if(recovery&&valid(recovery.data)){if(recovery.rev===rev&&confirm('Recover unsynced changes saved on this device?')){S={...defaults(),...recovery.data};pending=true;}else{download('Teacher-Hub-recovery.json',JSON.stringify(recovery.data,null,2),'application/json');clearCache(u.uid);}}window.hubAccount=u.uid;active=false;page='Dashboard';try{render();}catch(renderError){window.hubAccount=null;throw new Error('Workspace display failed: '+renderError.message);}active=true;document.body.classList.add('cloudReady');status(remote.data?'Cloud workspace loaded':'New cloud workspace');if(pending)window.cloudQueue();}catch(e){msg(e.code==='permission-denied'?'Workspace access denied. Check that your email is verified and the Firestore rules have been published.':'Unable to load cloud workspace. Check your connection and try signing in again. '+e.message);}});
 
 } catch(error) { clearTimeout(loginWatchdog); console.error('Firebase startup failed',error); loginMessage.textContent='Sign-in could not start: '+(error?.message||String(error))+' Reload the published GitHub Pages website and check your connection. Your saved records have not been changed.'; }
-</script></body></html>
+
+/* ATLAS 2.4 dashboard layout tweak */
+(function(){
+  const style=document.createElement('style');
+  style.textContent=`
+    .quicklinks.quicklinks-top{
+      max-width:1400px;
+      margin:0 auto 22px;
+      justify-content:center;
+      grid-template-columns:repeat(auto-fit,minmax(150px,190px));
+    }
+    .quicklinks.quicklinks-top button{
+      min-height:96px;
+    }
+    .quicklinks.quicklinks-top button span{
+      text-align:center;
+    }
+    @media (max-width: 760px){
+      .quicklinks.quicklinks-top{
+        max-width:none;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+      .quicklinks.quicklinks-top button{
+        min-height:82px;
+      }
+    }
+  `;
+  document.head.append(style);
+
+  const atlas24Render = render;
+  render = function(){
+    atlas24Render();
+    if(page==='Dashboard' && !stView){
+      const appEl = $('app');
+      const hero = appEl?.querySelector('.hero');
+      const links = appEl?.querySelector('.quicklinks');
+      if(hero && links){
+        links.classList.add('quicklinks-top');
+        hero.parentNode.insertBefore(links, hero);
+      }
+    }
+  };
+})();
+
+</script><script id="demo-boot">
+/* DEMO BUILD ONLY. Fictional data, never synced, never included in the production build. */
+(function(){
+const names=['Ava Fictional','Ben Example','Chloe Sample','Dev Placeholder','Ella Demo','Finn Testington','Grace Imaginary','Harvey Mock','Isla Notreal','Jack Pretend','Kiri Specimen','Leo Ficto'];
+S=defaults();
+S.year=2026;S.teacher='Demo Teacher';S.school='Fictional Primary';S.className='Year 3 Demo';S.teachingYear=3;
+S.terms=[['2026-01-27','2026-04-02'],['2026-04-20','2026-06-26'],['2026-07-13','2026-09-18'],['2026-10-05','2026-12-11']];
+S.holidays=[];
+S.students=names.map((n,i)=>({id:'demo-'+(i+1),name:n,birthday:'2018-'+String((i%12)+1).padStart(2,'0')+'-15'}));
+const tt=(day,start,end,subject,name='')=>({id:'tt-'+day.slice(0,3)+start.replace(':',''),day,start,end,subject,name});
+S.timetable=[];
+for(const d of ['Monday','Tuesday','Wednesday','Thursday','Friday']){
+ S.timetable.push(tt(d,'08:50','09:00','Morning Circle'));
+ S.timetable.push(tt(d,'09:00','10:00',d==='Wednesday'?'Maths':d==='Friday'?'HASS':'English'));
+ S.timetable.push(tt(d,'10:00','10:30',d==='Wednesday'?'Literacy':'Spelling'));
+ S.timetable.push(tt(d,'10:30','11:00','Recess'));
+ S.timetable.push(tt(d,'11:00','12:00','Maths'));
+ S.timetable.push(tt(d,'12:00','13:00','Lunch'));
+ S.timetable.push(tt(d,'13:00','14:00',d==='Thursday'?'Science':'Health & PE'));
+}
+window.hubAccount=null; /* never set: demo can not reach cloudQueue */
+try{localStorage.removeItem('teacherhub-demo')}catch(e){}
+document.body.classList.add('cloudReady');
+document.getElementById('cloudGate')?.setAttribute('hidden','');
+const style=document.createElement('style');style.textContent='#cloudGate{display:none!important}#demoBanner{position:fixed;bottom:0;right:0;z-index:99999;background:#b4501e;color:#fff;font:600 12px system-ui;padding:4px 10px;border-top-left-radius:8px}';document.head.append(style);
+const b=document.createElement('div');b.id='demoBanner';b.textContent='DEMO · fictional data · not saved to cloud';document.body.append(b);
+page='Dashboard';render();
+})();
+
+</script>
+</body></html>
