@@ -2144,6 +2144,7 @@ function evidenceFor(id){const out=[];
 
 /* ---------- comment builder ---------- */
 let rSem='1',rStu='',rEv=true;
+window.rpCtx=()=>({sem:rSem,id:rStu});window.rpLimit=()=>limit();
 stPages['Comment builder']=()=>{rSem=reportSem||rSem;const s=S.students.find(x=>x.id===(stStudent||rStu));rStu=s?s.id:'';const r=s?rep(rSem,s.id):{};const bk=bank();
  const list=S.students,idx=s?list.indexOf(s):-1;
  return `<div class="row section">${stPerson()}<select aria-label="Semester" onchange="reportSem=this.value;render()">${stOptions(['1','2'],reportSem)}</select>${stBtn('Load student',"stStudent=stVal('stPerson');render()",true)}${s?`${stBtn('◀ Previous',`rpStep(-1)`)}${stBtn('Next ▶',`rpStep(1)`)}`:''}</div>`+
@@ -2177,6 +2178,298 @@ window.rpPack=()=>{const done=S.students.filter(s=>rep(rSem,s.id).comment);if(!d
 
 /* ---------- Semester reports page: keep original, add shortcut ---------- */
 const css=document.createElement('style');css.textContent=`.rp-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}@media(max-width:900px){.rp-grid{grid-template-columns:1fr}}.rp-ev{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}.rp-ev button{margin-left:8px;font-size:12px;padding:2px 8px}.rp-over{color:#b3261e;font-weight:700}.rp-prog{height:12px;background:var(--line);border-radius:6px;overflow:hidden}.rp-prog i{display:block;height:100%;background:var(--accent)}`;document.head.appendChild(css);
+})();
+
+</script>
+<script id="mod-comments">
+/* ATLAS 3 · tick-based comment studio
+   The teacher ticks what is true for a student (qualities, subject levels, strengths, next steps, a real example).
+   The studio turns those ticks into flowing prose: it groups ideas, varies sentence patterns, avoids repeating openers,
+   uses pronouns, adds the teacher's own example and closes the comment. Nothing is judged by the studio, and nothing is sent anywhere:
+   every statement comes from a tick or from text the teacher typed. Selections are kept in ext().commentTicks['<sem>-<studentId>'].
+   Sentences are cached per student so a comment does not change when the page reloads; "Reword" re-rolls one sentence. */
+(function(){
+'use strict';
+const el=id=>document.getElementById(id);
+const esc=s=>e(String(s));
+const LV=[null,'Needs support','Working towards','At expectations','Above expectations'];
+const OV=[null,'Challenging','Steady','Positive','Very positive','Outstanding'];
+const QL=[null,'Developing','Usually','Consistently'];
+
+/* ---------- content library (Year 3). Skills are single-verb phrases so they can be put into the third person. ---------- */
+const AREAS=[
+ {id:'read',h:['reading together for ten minutes each night','asking questions about what is being read','visiting the library regularly'],g:'English',n:'Reading and viewing',a:'reading and viewing',sk:['read fluently with expression','use context and picture clues to work out unknown words','answer literal and inferential questions about texts','summarise the key ideas in a text','make connections between texts and personal experiences','read texts at an appropriate level with understanding']},
+ {id:'write',h:['encouraging regular short writing tasks such as diary entries','talking through ideas together before writing'],g:'English',n:'Writing',a:'writing',sk:['write well-structured texts','use descriptive vocabulary to engage the reader','organise ideas into paragraphs','edit writing for meaning and accuracy','use punctuation accurately, including speech marks','write texts for different purposes and audiences']},
+ {id:'spell',h:['practising high-frequency words in short bursts','playing word games together'],g:'English',n:'Spelling and grammar',a:'spelling and grammar',sk:['spell high-frequency words accurately','apply spelling rules and patterns','use sound and word-family knowledge to spell unknown words','use nouns, verbs and adjectives correctly in sentences','vary sentence structure in writing']},
+ {id:'speak',h:['talking about the day together at dinner','encouraging a say in family discussions'],g:'English',n:'Speaking and listening',a:'speaking and listening',sk:['share ideas clearly with a group','listen actively to others','speak with appropriate volume and expression','explain thinking clearly to others','take turns in discussions']},
+ {id:'hand',h:['practising letter formation for a few minutes each week'],g:'English',n:'Handwriting',a:'handwriting',sk:['form letters correctly and consistently','write legibly with correct size and spacing','join letters using the school handwriting style','present work neatly']},
+ {id:'num',h:['skip counting during everyday activities','reading and saying large numbers seen on signs and receipts'],g:'Maths',n:'Number and place value',a:'number and place value',sk:['work confidently with numbers to 10,000','partition numbers using place value','estimate and round numbers sensibly','skip count in steps of 2, 3, 5 and 10']},
+ {id:'addsub',h:['practising number facts for a few minutes each day','using shopping or cooking to solve number problems'],g:'Maths',n:'Addition and subtraction',a:'addition and subtraction',sk:['solve addition and subtraction problems using efficient strategies','recall addition and subtraction facts fluently','use mental strategies for two-digit numbers','check answers using the inverse operation']},
+ {id:'muldiv',h:['practising times tables in regular short bursts','using songs, games and apps to build recall'],g:'Maths',n:'Multiplication and division',a:'multiplication and division',sk:['recall multiplication facts for 2, 3, 5 and 10','use arrays and equal groups to solve problems','explain the relationship between multiplication and division','solve word problems involving multiplication and division']},
+ {id:'frac',h:['cutting food into equal parts to name fractions together','using recipes to explore halves and quarters'],g:'Maths',n:'Fractions',a:'fractions',sk:['represent unit fractions using models','order fractions with the same denominator','count by halves, thirds, quarters and fifths','find fractions of a collection']},
+ {id:'meas',h:['measuring ingredients and objects at home','talking about time using an analogue clock'],g:'Maths',n:'Measurement and time',a:'measurement and time',sk:['measure length, mass and capacity using suitable units','tell time to the minute','solve problems involving money','order events by their duration']},
+ {id:'geo',h:['spotting shapes and angles around the house','giving and following directions together'],g:'Maths',n:'Geometry and space',a:'geometry and space',sk:['describe two-dimensional shapes and three-dimensional objects','use positional language and simple maps','describe angles as bigger or smaller than a right angle','identify lines of symmetry']},
+ {id:'stat',h:['collecting and graphing simple family data','talking about chance during games'],g:'Maths',n:'Statistics and probability',a:'statistics and probability',sk:['represent data in tables and graphs','interpret simple data displays','describe the likelihood of everyday events','conduct chance experiments with care']},
+ {id:'reason',h:['asking “how do you know?” when solving problems together'],g:'Maths',n:'Mathematical reasoning',a:'mathematical reasoning',sk:['explain reasoning using mathematical language','persist with unfamiliar problems','choose appropriate strategies to solve problems','justify answers with evidence']},
+ {id:'sci',h:['exploring and talking about nature and everyday science'],g:'Other subjects',n:'Science',a:'Science',sk:['make sensible predictions based on observations','record observations carefully','share findings with others','describe how heat moves between objects','explore how forces change the way objects move']},
+ {id:'hass',h:['talking about local places and family history'],g:'Other subjects',n:'HASS',a:'HASS',sk:['use sources to answer inquiry questions','describe the features and importance of places','explain how communities change over time','compare the past and present using evidence']},
+ {id:'hpe',h:['encouraging regular physical activity and sport'],g:'Other subjects',n:'Health and Physical Education',a:'Health and Physical Education',sk:['demonstrate fundamental movement skills','show fair play during games and activities','work cooperatively in team games','describe ways to keep healthy and safe']},
+ {id:'arts',h:['encouraging drawing, music and creative play'],g:'Other subjects',n:'The Arts',a:'the Arts',sk:['experiment with materials, techniques and ideas','reflect thoughtfully on artworks','share creative work with confidence','explore ideas through visual art, music and drama']},
+ {id:'tech',h:['talking about safe and responsible technology use'],g:'Other subjects',n:'Technologies',a:'Technologies',sk:['design solutions to simple problems','follow steps to complete digital tasks','improve designs through testing','use digital tools safely and responsibly']}
+];
+const TRAITS=[
+ {id:'att',n:'Positive attitude',c:['approaches every task with a positive attitude','shows genuine enthusiasm for learning','is eager to take on new challenges'],u:['usually approaches learning positively','generally shows a willingness to try new tasks'],d:['a positive approach to challenging tasks','motivation to start tasks promptly']},
+ {id:'eff',n:'Effort and persistence',c:['consistently puts in a strong effort','persists when tasks become challenging','takes pride in the quality of work produced'],u:['generally puts in good effort','usually keeps trying when tasks become difficult'],d:['persistence when tasks are challenging','stamina for completing tasks to a high standard']},
+ {id:'col',n:'Collaboration',c:['works cooperatively with classmates','listens respectfully to others','is a reliable group member'],u:['usually works well with a range of peers','generally shares ideas with the group'],d:['skills for working cooperatively in groups','confidence to share and listen in group tasks']},
+ {id:'ind',n:'Independence and organisation',c:['manages time well when working independently','completes tasks on time','takes responsibility for learning'],u:['generally works independently','usually organises materials well'],d:['independence in completing tasks','organisation of materials and time']},
+ {id:'beh',n:'Respect and behaviour',c:['demonstrates respect for peers and staff','follows classroom expectations consistently','makes thoughtful choices'],u:['usually follows classroom expectations','generally makes positive choices'],d:['consistency in following classroom expectations','strategies for making positive choices when unsettled']},
+ {id:'par',n:'Participation',c:['contributes thoughtful ideas to class discussions','asks questions that extend learning','participates actively in lessons'],u:['often contributes to class discussions','usually participates in lessons'],d:['confidence to contribute to class discussions','willingness to ask questions when unsure']},
+ {id:'res',n:'Resilience and feedback',c:['uses feedback to improve','learns from mistakes','bounces back from setbacks'],u:['usually responds well to feedback'],d:['using feedback to improve work','resilience when things do not go to plan']},
+ {id:'cur',n:'Curiosity and creativity',c:['asks questions to extend thinking','approaches tasks with creativity'],u:['sometimes offers creative ideas'],d:['confidence in sharing creative ideas']},
+ {id:'kind',n:'Kindness and friendship',c:['is kind and caring towards others','is a positive role model for peers'],u:['is generally friendly and considerate'],d:['positive friendships and conflict-resolution strategies']}
+];
+
+/* ---------- sentence patterns. {N} name, {s} he/she/name, {S} same, capitalised, {p} his/her, {A} area, {st} third-person strengths, {nx} next steps, {ex} example ---------- */
+const BANK={
+ warm:{
+  open:{5:['{N} has had an outstanding {T}.','What a fantastic {T} {N} has had.','{N} has had an excellent {T} and has achieved so much.','It has been a pleasure to teach {N} this {T}, and {s} should be very proud of {p} achievements.'],
+        4:['{N} has had a very positive {T}.','It has been wonderful to watch {N} grow this {T}.','{N} has had a really successful {T}.'],
+        3:['{N} has had a positive {T}.','{N} has settled well and made good progress this {T}.','It has been rewarding to teach {N} this {T}.'],
+        2:['{N} has made steady progress this {T}.','{N} has worked at building skills and confidence this {T}.','This {T} has seen {N} continue to develop as a learner.'],
+        1:['This {T} has had some challenges for {N}, and we have worked together to build confidence.','{N} has worked hard to meet the demands of this {T}.','{N} has faced some challenges this {T} and has shown a willingness to keep trying.']},
+  L:{4:{plain:['{N} is working above the expected level in {A}.','{A} is a real strength for {N}, who is achieving above the expected standard.','{N} has excelled in {A} and is exceeding the expected standard.','In {A}, {N} is working well above what is expected at this stage.'],
+        skill:['{N} is working above the expected level in {A} and {st}.','{A} is a real strength for {N}, who {st}.','{N} has excelled in {A}. {S} {st}.','In {A}, {N} is working well above what is expected and {st}.','{N} has shown excellent understanding in {A}, where {s} {st}.']},
+     3:{plain:['{N} is meeting the expected standard in {A}.','{N} has made solid progress in {A} and is working at the expected level.','In {A}, {N} is achieving at the expected level.','{N} is working confidently at the expected level in {A}.'],
+        skill:['{N} is meeting the expected standard in {A} and {st}.','In {A}, {N} {st}.','{N} has made solid progress in {A}. {S} {st}.','{N} is working at the expected level in {A}, where {s} {st}.','{N} demonstrates a secure understanding in {A}: {s} {st}.']},
+     2:{plain:['{N} is working towards the expected level in {A}.','{A} is an area where {N} is continuing to build skills and confidence.','{N} is making progress in {A} and is working towards the expected standard.','In {A}, {N} is developing the skills needed to reach the expected level.'],
+        skill:['{N} is working towards the expected level in {A} and {st}.','{N} is making steady progress in {A} and {st}.','In {A}, {N} is continuing to build confidence. {S} {st}.','{A} is developing for {N}, who {st}.']},
+     1:{plain:['{N} is receiving additional support in {A} while building foundational skills.','{A} is an area of challenge for {N}, and support is in place to build confidence.','{N} needs continued support in {A} to work towards the expected level.','In {A}, {N} is working on foundational skills with support.'],
+        skill:['{N} is working on foundational skills in {A} and {st}.','{N} needs continued support in {A}, although {s} {st}.','In {A}, {N} is building foundations with support and {st}.','{A} is challenging for {N} at times; however, {s} {st}.']}},
+  ex:['This was evident {ex}.','{S} showed this {ex}.','This could be seen {ex}.','This was particularly clear {ex}.'],
+  mean:{4:['This reflects a deep understanding of the concepts taught.','{S} approaches new challenges in {A} with confidence.','This is a real credit to the effort {s} puts in.'],
+        3:['This reflects a secure understanding of what has been taught so far.','{S} applies these skills with growing confidence.','This shows steady, consistent growth.'],
+        2:['With continued practice, {s} is building a firmer understanding.','Regular practice will help {N} consolidate these skills.','With time and practice, these skills will become more secure.'],
+        1:['With support and regular practice, {N} is building confidence in this area.','Each small step forward is building {N}’s confidence.','Small steps are making a difference for {N}.']},
+  home:['At home, {N} would benefit from {hm}.','You can support {N} at home by {hm}.','At home, families can help {N} by {hm}.'],
+  home2:['Another helpful step is {hm}.','It would also help to continue {hm}.'],
+  impact:['These qualities have supported {N}’s learning throughout the {T}.','Qualities like these help {N} to make the most of every learning opportunity.','This approach has supported {N}’s growth as a learner this {T}.'],
+  proud:{hi:['I am proud of the effort {N} has put into learning this {T}.','{N} should feel very proud of what has been achieved this {T}.'],mid:['I am pleased with the effort {N} has put into learning this {T}.'],lo:['I appreciate the effort {N} has put into learning this {T}.','{N} has shown a willingness to keep trying this {T}, and that is something to celebrate.']},
+  partner:['Thank you for your continued support at home.','Thank you for the support you provide at home, which makes such a difference.','Working together, we can continue to support {N}’s learning.'],
+  nx:['A next step for {N} is to {nx}.','Next, {N} will focus on learning to {nx}.','To build on this, {N} would benefit from practice to {nx}.','{N}’s next goal is to {nx}.','In {A}, {N} will continue working to {nx}.','Moving forward, {N} will focus on learning to {nx}.'],
+  qc:['{N} {pl}.','Throughout the {T}, {N} has been a student who {pl}.','{N} {pl}, which has contributed positively to the classroom.','A valued member of our class, {N} {pl}.'],
+  qc2:['{S} also {pl}.','In addition, {s} {pl}.','{S} {pl} as well.'],
+  qu:['{N} {pl}.','{N} {pl}, and this supports learning in the classroom.'],
+  qu2:['{S} also {pl}.','As well as this, {s} {pl}.'],
+  qd:['{N} is continuing to develop {dl}.','A focus for {N} is building {dl}.','{N} is working on {dl}.','To continue growing, {N} will keep developing {dl}.','An area of focus for {N} is {dl}.'],
+  qda:['At the same time, {N} is continuing to develop {dl}.','Alongside this, {N} is working on {dl}.','A next step is for {N} to build {dl}.','To keep growing, {N} will focus on {dl}.'],
+  close:{s1hi:['I look forward to supporting {N} to keep growing in Semester 2.','Well done on a great start to the year, {N}.','I am excited to see what {N} achieves in Semester 2.'],
+         s1mid:['I look forward to supporting {N} to keep growing in Semester 2.','Thank you for your efforts so far this year, {N}.'],
+         s1lo:['I look forward to continuing to support {N} in Semester 2.','We will keep working together to build {N}’s confidence in Semester 2.'],
+         s2hi:['Congratulations on a wonderful year, {N}. I wish you all the best for the year ahead.','Thank you for all your efforts this year, {N}. I look forward to seeing you continue to flourish.','I wish {N} all the best for the year ahead.'],
+         s2mid:['Thank you for your efforts this year, {N}. I wish you all the best for the year ahead.','I wish {N} all the best for the year ahead.'],
+         s2lo:['I wish {N} all the best for the year ahead and know continued support will help {s} grow.','Thank you for your efforts this year, {N}. I wish you all the best for the year ahead.']}
+ },
+ formal:{
+  open:{5:['{N} has achieved outstanding results this {T}.','{N} has demonstrated exceptional achievement this {T}.'],4:['{N} has demonstrated very positive achievement this {T}.','{N} has had a very successful {T}.'],3:['{N} has demonstrated positive progress this {T}.','{N} has made good progress this {T}.'],2:['{N} has demonstrated steady progress this {T}.','{N} has progressed steadily this {T}.'],1:['{N} has experienced some challenges this {T}.','{N} has required additional support this {T}.']},
+  L:{4:{plain:['{N} is working above the expected level in {A}.','{N} has demonstrated achievement above the expected standard in {A}.'],skill:['{N} has demonstrated achievement above the expected standard in {A} and {st}.','In {A}, {N} is working above the expected level and {st}.']},
+     3:{plain:['{N} is achieving at the expected standard in {A}.','{N} has demonstrated a sound understanding of {A}.'],skill:['{N} is achieving at the expected standard in {A} and {st}.','{N} has demonstrated a sound understanding of {A} and {st}.']},
+     2:{plain:['{N} is working towards the expected standard in {A}.','{N} is progressing towards the expected standard in {A}.'],skill:['{N} is working towards the expected standard in {A} and {st}.','In {A}, {N} is progressing towards the expected standard and {st}.']},
+     1:{plain:['{N} requires continued support to achieve the expected standard in {A}.','{N} is working on foundational skills in {A}.'],skill:['{N} requires continued support in {A}, although {s} {st}.','{N} is working on foundational skills in {A} and {st}.']}},
+  ex:['This was demonstrated {ex}.','This was observed {ex}.'],
+  mean:{4:['This reflects a thorough understanding of the concepts taught.'],3:['This reflects a sound understanding of the content taught.'],2:['With continued practice, understanding will become more secure.'],1:['With support and regular practice, confidence will continue to develop.']},
+  home:['At home, {N} would benefit from {hm}.','Families can support {N} at home by {hm}.'],home2:['A further suggestion is {hm}.'],
+  impact:['These qualities have supported {N}’s learning this {T}.'],proud:{hi:['{N} should be proud of this {T}’s achievements.'],mid:['{N}’s effort this {T} is appreciated.'],lo:['{N}’s effort this {T} is appreciated.']},
+  partner:['Thank you for your continued support at home.'],
+  nx:['An area for continued development is the ability to {nx}.','{N} will be supported to {nx}.','A focus for next {T} will be for {N} to {nx}.'],
+  qc:['{N} {pl}.','{N} is a student who {pl}.'],qc2:['{S} also {pl}.','Additionally, {s} {pl}.'],qu:['{N} {pl}.'],qu2:['{S} also {pl}.'],
+  qd:['{N} is continuing to develop {dl}.','An area of focus for {N} is {dl}.'],qda:['Additionally, {N} is continuing to develop {dl}.','A further focus for {N} is {dl}.'],
+  close:{s1hi:['{N} is encouraged to continue this progress in Semester 2.'],s1mid:['{N} is encouraged to continue this progress in Semester 2.'],s1lo:['Continued support will be provided to {N} in Semester 2.'],
+         s2hi:['I wish {N} every success for the year ahead.'],s2mid:['I wish {N} all the best for the year ahead.'],s2lo:['Continued support will assist {N} in the year ahead.']}
+ }
+};
+
+/* ---------- helpers ---------- */
+const IRR={have:'has',do:'does',go:'goes'};
+function v3(base){const w=String(base).trim().split(' ');const v=w[0].toLowerCase();let o;
+ if(IRR[v])o=IRR[v];else if(/(s|x|z|ch|sh)$/.test(v))o=v+'es';else if(/[^aeiou]y$/.test(v))o=v.slice(0,-1)+'ies';else o=v+'s';
+ w[0]=o;return w.join(' ')}
+const join=a=>{const sep=a.some(x=>x.includes(','))?'; ':', ';return a.length<2?(a[0]||''):a.slice(0,-1).join(sep)+' and '+a[a.length-1]};
+const capFirst=s=>s.replace(/^(\W*)([a-z])/,(m,a,b)=>a+b.toUpperCase());
+const fixEnd=s=>{s=s.replace(/\s+/g,' ').replace(/\s+([.,;:])/g,'$1').trim();return /[.!?]$/.test(s)?s:s+'.'};
+const fw=s=>(s.split(/[^A-Za-z’']+/).find(Boolean)||'').toLowerCase();
+function rng(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19}let a=h>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const pick=(r,a)=>a[Math.floor(r()*a.length)];
+const chunk=(a,n)=>{const o=[];for(let i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o};
+const store=()=>{const x=ext();x.commentTicks??={};return x.commentTicks};
+const custom=()=>{const x=ext();x.commentCustom??={};return x.commentCustom};
+const prons=()=>{const x=ext();x.commentPron??={};return x.commentPron};
+const ctxIds=()=>{const c=rpCtx();return{sem:c.sem,id:c.id}};
+function tick(id,sem){const o=store(),k=sem+'-'+id;const t=o[k]??={tone:'warm',overall:0,qual:{},areas:{},seed:1,fit:0,extra:'',cache:{},var:{}};t.cache??={};t.var??={};t.qual??={};t.areas??={};return t}
+const skillsOf=a=>a.sk.concat((custom()[a.id]||[]));
+function exFrag(x){x=String(x||'').trim().replace(/[.\s]+$/,'');if(!x)return'';return /^(when|while|during|in|at|on|after|before|as|through|throughout|whenever)\b/i.test(x)?x:'when '+x}
+
+/* ---------- the realiser ---------- */
+const MIN=900;
+const maxLen=()=>Math.min(1200,rpLimit());
+function build(id,sem,o={}){
+ const st=S.students.find(x=>x.id===id);if(!st)return{sentences:[],text:''};
+ const t=tick(id,sem),N=String(st.name).trim().split(/\s+/)[0],pr=prons()[id]||'';
+ const tone=BANK[t.tone]?t.tone:'warm',B=BANK[tone],fit=o.fit??(t.fit||0),layers=o.layers||0;
+ const P={s:pr==='he'?'he':pr==='she'?'she':N,p:pr==='he'?'his':pr==='she'?'her':''};
+ const ctx={used:new Set(),prev:'',tone,pron:pr,fit,sem,id,t};
+ const T=sem==='2'?'year':'semester';
+ const fill=(f,o)=>f.replace(/\{N\}/g,N).replace(/\{s\}/g,P.s).replace(/\{S\}/g,capFirst(P.s)).replace(/\{p\}/g,P.p).replace(/\{T\}/g,T).replace(/\{A\}/g,o.A||'').replace(/\{st\}/g,o.st||'').replace(/\{nx\}/g,o.nx||'').replace(/\{ex\}/g,o.ex||'').replace(/\{pl\}/g,o.pl||'').replace(/\{dl\}/g,o.dl||'').replace(/\{hm\}/g,o.hm||'');
+ const usable=bank=>{const u=bank.filter(f=>(P.p||!f.includes('{p}'))&&!(ctx.multi&&/\{A\} (is|are)\b/.test(f)));const fresh=u.filter(f=>!ctx.used.has(f));return fresh.length?fresh:u};
+ const out=[];
+ if(!(t.overall||Object.keys(t.qual).length||AREAS.some(a=>(t.areas[a.id]||{}).lvl)||String(t.extra||'').trim()))return{sentences:[],text:''};
+ function sentence(key,kind,sigData,gen,g){
+  const v=(t.var||{})[key]||0;const sig=JSON.stringify([sigData,tone,pr,t.seed,v,fit]);const c=t.cache[key];let text;
+  if(c&&c.sig===sig)text=c.text;
+  else{for(let i=0;i<8;i++){const r=rng([id,sem,t.seed,key,v,i].join('|'));text=capFirst(fixEnd(gen(r)));if(fw(text)!==ctx.prev&&(!v||!c||text!==c.text))break}t.cache[key]={sig,text}}
+  ctx.prev=fw(text);out.push({key,kind,text,g})}
+ const frame=(r,bank,o)=>{ctx.multi=!!o.multi;const f=pick(r,usable(bank));ctx.used.add(f);return fill(f,o)};
+
+ /* opener */
+ if(t.overall&&B.open[t.overall])sentence('open','Opening',[t.overall],r=>frame(r,B.open[t.overall],{}));
+ /* qualities */
+ const byLvl={3:[],2:[],1:[]};for(const tr of TRAITS){const l=t.qual[tr.id];if(l)byLvl[l].push(tr)}
+ const items=(list,lvl)=>list.map(tr=>pick(rng([id,sem,t.seed,tr.id,lvl].join('|')),lvl===3?tr.c:lvl===2?tr.u:tr.d));
+ let hadPos=false,qleft=fit>=5?3:fit>=2?4:99;
+ for(const lvl of [3,2]){const L=byLvl[lvl].slice(0,qleft);if(!L.length)continue;qleft-=L.length;const pls=items(L,lvl);hadPos=true;
+  chunk(pls,3).forEach((c,i)=>{const bk=lvl===3?(i?B.qc2:B.qc):(i?B.qu2:B.qu);sentence('q'+lvl+'-'+i,'Qualities',[c],r=>frame(r,bk,{pl:join(c)}))})}
+ if(byLvl[1].length&&(fit<3||!hadPos)){const dls=items(byLvl[1],1);chunk(dls,3).forEach((c,i)=>sentence('q1-'+i,'Qualities',[c,hadPos],r=>frame(r,hadPos&&i===0?B.qda:B.qd,{dl:join(c)})))}
+ if(layers>=2&&hadPos&&byLvl[3].length&&t.overall>=3)sentence('impact','Qualities',[1],r=>frame(r,B.impact,{}));
+ /* subject areas */
+ const chosen=AREAS.filter(a=>(t.areas[a.id]||{}).lvl);
+ const plain={4:[],3:[],2:[],1:[]},rich=[];
+ for(const a of chosen){const d=t.areas[a.id];const stg=(d.st||[]).filter(x=>skillsOf(a).includes(x)),nxs=(d.nx||[]).filter(x=>skillsOf(a).includes(x));const ex=exFrag(d.ex);
+  if((!stg.length&&!nxs.length&&!ex)||(fit>=6&&rich.length>=2))plain[d.lvl].push(a);else rich.push({a,d,stg:fit>=5?stg.slice(0,1):fit>=1?stg.slice(0,2):stg,nxs:fit>=5?(rich.length<2?nxs.slice(0,1):[]):fit>=3?nxs.slice(0,1):nxs,ex})}
+ let meaned=0,exN=0;
+ for(const g of ['English','Maths','Other subjects']){
+  for(const {a,d,stg,nxs,ex} of rich.filter(x=>x.a.g===g)){
+   const key='a:'+a.id;
+   if(stg.length){const cs=chunk(stg,3);cs.forEach((c,i)=>{sentence(key+':'+i,a.n,[d.lvl,c],r=>i?frame(r,['{S} also {st}.','{S} {st} as well.','In addition, {s} {st}.'],{st:join(c.map(v3))}):frame(r,B.L[d.lvl].skill,{A:a.a,st:join(c.map(v3))}),g)})}
+   else sentence(key+':0',a.n,[d.lvl],r=>frame(r,B.L[d.lvl].plain,{A:a.a}),g);
+   if(ex&&(fit<3||(fit<4&&exN<2))&&++exN)sentence(key+':ex',a.n,[ex],r=>frame(r,B.ex,{ex}),g);
+   if(layers>=1&&stg.length&&meaned<3&&B.mean){meaned++;sentence(key+':mean',a.n,[d.lvl,1],r=>frame(r,B.mean[d.lvl],{A:a.a}),g)}
+   if(nxs.length)sentence(key+':nx',a.n,[nxs.slice(0,3)],r=>frame(r,B.nx,{A:a.a,nx:join(nxs.slice(0,3))}),g)}
+  for(const lvl of [4,3,2,1]){const L=plain[lvl].filter(a=>a.g===g);if(!L.length)continue;
+   chunk(L,4).forEach((c,i)=>{const nm=join(c.map(a=>a.a));sentence('p'+lvl+'-'+g[0]+i,'Subjects',[lvl,c.map(a=>a.id)],r=>frame(r,B.L[lvl].plain,{A:nm,multi:c.length>1}),g)})}}
+ /* how families can help (ticked per subject) */
+ const hms=[];for(const a of chosen){for(const h of ((t.areas[a.id]||{}).hm||[]))if(a.h.includes(h))hms.push(h)}
+ const hmUse=hms.slice(0,fit>=4?2:fit>=1?3:6);
+ chunk(hmUse,3).forEach((c,i)=>sentence('home-'+i,'At home',[c],r=>frame(r,i?B.home2:B.home,{hm:join(c)})));
+ /* teacher's own words */
+ const extra=String(t.extra||'').trim();if(extra){out.push({key:'extra',kind:'Your words',text:capFirst(fixEnd(extra))});ctx.prev=fw(extra)}
+ if(layers>=4&&t.overall&&B.proud)sentence('proud','Closing',[t.overall,sem],r=>frame(r,B.proud[t.overall>=4?'hi':t.overall===3?'mid':'lo'],{}));
+ if(layers>=3&&B.partner)sentence('partner','Closing',[1],r=>frame(r,B.partner,{}));
+ /* closer */
+ if(t.overall){const b=t.overall>=4?'hi':t.overall===3?'mid':'lo';const arr=B.close[(sem==='2'?'s2':'s1')+b];sentence('close','Closing',[t.overall,sem],r=>frame(r,arr,{}))}
+ /* smoothing (applied to the finished text, so cached sentences never change): subject bridges and pronouns */
+ const texts=out.map(x=>x.text);
+ const startsName=x=>x.startsWith(N+' ');
+ const seen={};let any=false;
+ out.forEach((x,i)=>{if(x.g){if(!seen[x.g]){seen[x.g]=1;if(x.g!=='English'&&any&&/^In /.test(texts[i])&&!/^In (Maths|English)/.test(texts[i])){texts[i]=pick(rng([id,sem,t.seed,'bridge',x.g].join('|')),['Turning to ','Moving on to '])+texts[i].slice(3)}else if(startsName(texts[i])&&(any||x.g!=='English')){const r=rng([id,sem,t.seed,'bridge',x.g].join('|'));const opts=x.g==='English'?['In English, ']:x.g==='Maths'?['In Maths, ','Turning to Maths, ','Moving on to Maths, ']:['Across the wider curriculum, ','In other areas of the curriculum, '];if(out.filter(y=>y.g).length>1||x.g!=='English')texts[i]=pick(r,opts)+texts[i]}}any=true}});
+ if(P.p)for(let i=1;i<texts.length;i++){if(startsName(texts[i])&&startsName(texts[i-1]))texts[i]=capFirst(P.s)+texts[i].slice(N.length)}
+ out.forEach((x,i)=>x.text=texts[i]);
+ return{sentences:out,text:out.map(x=>x.text).join(' ')}}
+/* length: aim for 900 to 1200 characters unless the teacher asks for exactly what was ticked */
+function final(id,sem){const t=tick(id,sem);
+ if(t.len==='ticked'){const r=build(id,sem,{layers:0,fit:t.fit||0});return Object.assign(r,{layers:0,fit:t.fit||0,mode:'ticked'})}
+ const MAX=maxLen();let pick=null,prev=null;
+ for(let L=0;L<=4;L++){const r=build(id,sem,{layers:L,fit:0});pick={r,L,fit:0};if(r.text.length>=MIN)break;prev=pick}
+ if(pick.r.text.length>MAX){let ok=null;for(let f=1;f<=6&&!ok;f++){const r=build(id,sem,{layers:pick.L,fit:f});if(r.text.length<=MAX)ok={r,L:pick.L,fit:f}}
+  if(!ok&&pick.L>0){for(let f=0;f<=6&&!ok;f++){const r=build(id,sem,{layers:pick.L-1,fit:f});if(r.text.length<=MAX)ok={r,L:pick.L-1,fit:f}}}
+  if(ok)pick=ok;else{const r=build(id,sem,{layers:0,fit:6});pick={r,L:0,fit:6}}}
+ return Object.assign(pick.r,{layers:pick.L,fit:pick.fit,mode:'auto'})}
+function hints(id,sem){const t=tick(id,sem),h=[];const ch=AREAS.filter(a=>(t.areas[a.id]||{}).lvl);
+ if(!t.overall)h.push('Choose an overall impression.');
+ if(Object.keys(t.qual).length<3)h.push('Tick a few more learner qualities.');
+ if(!ch.length)h.push('Choose levels for English and Maths.');
+ const noEx=ch.filter(a=>!(t.areas[a.id].ex||'').trim());if(noEx.length)h.push('Add a real example for '+noEx[0].n+'.');
+ const noHm=ch.filter(a=>!(t.areas[a.id].hm||[]).length);if(noHm.length)h.push('Tick a way families can help in '+noHm[0].n+'.');
+ const noSt=ch.filter(a=>!(t.areas[a.id].st||[]).length);if(noSt.length)h.push('Tick some strengths for '+noSt[0].n+'.');
+ if(!String(t.extra||'').trim())h.push('Add a sentence in your own words.');
+ return h.slice(0,4)}
+window.tbBuild=(id,sem)=>final(id,sem);window.tbBuildRaw=build;window.tbHints=hints;window.tbV3=v3;
+
+/* ---------- similarity to other students' saved comments ---------- */
+const sh=s=>{const w=s.toLowerCase().replace(/[^a-z0-9’' ]+/g,' ').split(/\s+/).filter(Boolean),o=new Set();for(let i=0;i+3<w.length;i++)o.add(w.slice(i,i+4).join(' '));return o};
+function similar(id,sem,text){const a=sh(text);if(a.size<4)return null;let best=null;
+ for(const s of S.students){if(s.id===id)continue;const r=ext().reports[sem+'-'+s.id];if(!r||!r.comment)continue;const b=sh(r.comment);if(b.size<4)continue;let n=0;for(const x of a)if(b.has(x))n++;const j=n/(a.size+b.size-n);if(!best||j>best.j)best={j,name:s.name}}
+ return best&&best.j>=.25?best:null}
+
+/* ---------- UI ---------- */
+const openAreas=new Set();
+const first=()=>{const{id}=ctxIds();const s=S.students.find(x=>x.id===id);return s?String(s.name).split(' ')[0]:''};
+function seg(label,opts,cur,fn){return `<div class="tb-seg" role="group" aria-label="${esc(label)}">${opts.map(([v,t])=>`<button type="button" aria-pressed="${cur===v}" class="${cur===v?'on':''}" onclick="${fn}(${typeof v==='string'?`'${v}'`:v})">${esc(t)}</button>`).join('')}</div>`}
+function inner(){const{sem,id}=ctxIds();const t=tick(id,sem),pr=prons()[id]||'';const res=final(id,sem);const lim=maxLen();const n=res.text.length;const hs=n<MIN?hints(id,sem):[];const sim=similar(id,sem,res.text);
+ const traits=TRAITS.map(tr=>`<div class="tb-row"><span class="tb-lab">${esc(tr.n)}</span><div class="tb-seg" role="group" aria-label="${esc(tr.n)}">${[3,2,1].map(l=>`<button type="button" aria-pressed="${t.qual[tr.id]===l}" class="${t.qual[tr.id]===l?'on':''}" onclick="tbQ('${tr.id}',${l})">${QL[l]}</button>`).join('')}</div></div>`).join('');
+ const groups=['English','Maths','Other subjects'].map(g=>`<h4>${g}</h4>`+AREAS.filter(a=>a.g===g).map(a=>{const d=t.areas[a.id]||{};const sk=skillsOf(a),cust=custom()[a.id]||[];
+  const body=d.lvl?`<div class="tb-cols"><div><b>Doing well</b>${sk.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.st||[]).includes(x)?'checked':''} onchange="tbSk('${a.id}','st',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div><div><b>Next step</b>${sk.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.nx||[]).includes(x)?'checked':''} onchange="tbSk('${a.id}','nx',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div></div>
+   <div class="tb-home"><b>How families can help</b>${a.h.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.hm||[]).includes(x)?'checked':''} onchange="tbHm('${a.id}',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div>
+   <label class="field">A real example (optional)<input value="${esc(d.ex||'')}" maxlength="160" placeholder="e.g. during the class garden project, or when explaining the fractions task" onchange="tbEx('${a.id}',this.value)"></label>
+   <div class="tb-add"><input id="tbAdd_${a.id}" placeholder="Add your own skill, starting with a verb, e.g. “use a ruler accurately”" aria-label="Add a skill for ${esc(a.n)}" onkeydown="if(event.key==='Enter'){event.preventDefault();tbAdd('${a.id}')}"><button type="button" onclick="tbAdd('${a.id}')">Add</button>${cust.length?`<small class="muted">Your skills: ${cust.map((x,i)=>`${esc(x)} <a href="#" onclick="event.preventDefault();tbDel('${a.id}',${i})" aria-label="Remove ${esc(x)}">remove</a>`).join(' · ')}</small>`:''}</div>`:'';
+  return `<details class="tb-area" ${openAreas.has(a.id)||d.lvl?'open':''} ontoggle="tbTog('${a.id}',this.open)"><summary><span>${esc(a.n)}</span><span class="tb-pill ${d.lvl?'on':''}">${d.lvl?LV[d.lvl]:'Not included'}</span></summary><div class="tb-lvls" role="group" aria-label="${esc(a.n)} level">${[4,3,2,1].map(l=>`<button type="button" aria-pressed="${d.lvl===l}" class="${d.lvl===l?'on':''}" onclick="tbA('${a.id}',${l})">${LV[l]}</button>`).join('')}${d.lvl?`<button type="button" onclick="tbA('${a.id}',0)">Remove</button>`:''}</div>${body}</details>`}).join('')).join('');
+ const prev=res.sentences.length?res.sentences.map(s=>`<span class="tb-s" title="${esc(s.kind)}">${esc(s.text)}${s.key==='extra'?'':` <button type="button" class="tb-re" aria-label="Reword this sentence" title="Reword this sentence" onclick="tbSwap('${esc(s.key)}')">↻</button>`}</span>`).join(' '):'<p class="muted">Tick an overall impression, some qualities or a subject level and the comment appears here.</p>';
+ return `<div class="tb-grid"><div class="tb-left">
+  <h3>1 · Overall</h3><div class="tb-row"><span class="tb-lab">This ${rpCtx().sem==='2'?'year':'semester'} was</span>${seg('Overall impression',[[5,'Outstanding'],[4,'Very positive'],[3,'Positive'],[2,'Steady'],[1,'Challenging']],t.overall,'tbOv')}</div>
+  <div class="tb-row"><span class="tb-lab">Refer to ${esc(first())} as</span>${seg('Pronoun',[['he','He'],['she','She'],['','Name only']],pr,'tbPr')}</div>
+  <div class="tb-row"><span class="tb-lab">Tone</span>${seg('Tone',[['warm','Warm'],['formal','Formal']],t.tone,'tbTone')}</div>
+  <div class="tb-row"><span class="tb-lab">Length</span>${seg('Length',[['auto','Aim for 900–1200'],['ticked','Just what I ticked']],t.len==='ticked'?'ticked':'auto','tbLen')}</div>
+  <h3>2 · Learner qualities</h3><p class="muted">Tick how consistently each is true. Leave blank to skip.</p>${traits}
+  <h3>3 · Subjects</h3><p class="muted">Choose a level, then tick strengths, next steps and an example. Subjects with no ticks are grouped into one sentence.</p>${groups}
+  <h3>4 · Anything else</h3><label class="field">In your own words<textarea rows="2" onchange="tbExtra(this.value)" placeholder="A sentence only you could write about ${esc(first())}.">${esc(t.extra||'')}</textarea></label>
+ </div><div class="tb-right" role="complementary" aria-label="Comment preview"><div class="tb-card"><h3>Preview</h3><div class="tb-prev" aria-live="polite">${prev}</div>
+  <div class="tb-bar" role="img" aria-label="${n} characters, target 900 to ${lim}"><i style="left:${900/14}%;width:${(lim-900)/14}%"></i><b class="${n>lim?'over':n<MIN?'under':'ok'}" style="width:${Math.min(100,n/14)}%"></b></div>
+  <div class="tb-meta"><span class="${n>lim?'rp-over':''}">${n} characters · target 900–${lim}${n>lim?' · over':n<MIN?' · a little short':' · in range'}</span>${res.mode==='auto'&&res.layers?`<span class="muted">Extra detail added: ${res.layers}</span>`:''}</div>
+  ${hs.length?`<div class="tb-hint"><b>To add more detail:</b><ul>${hs.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
+  ${sim?`<p class="tb-warn">This is ${Math.round(sim.j*100)}% similar to ${esc(sim.name)}’s comment. Add a real example or reword a sentence to make it more individual.</p>`:''}
+  <div class="row"><button type="button" class="primary" onclick="tbUse()" ${res.text?'':'disabled'}>Use in comment box</button><button type="button" onclick="tbRegen()">New version</button>${res.mode==='ticked'&&n>lim?'<button type="button" onclick="tbFit(1)">Shorten to fit</button>':''}${res.mode==='ticked'&&t.fit?'<button type="button" onclick="tbFit(0)">Restore detail</button>':''}</div>
+  <p class="muted">Everything here comes from your ticks and words. Read it, then edit freely in the comment box below before saving.</p></div></div></div>`}
+function html(){return `<section class="tb card" id="tb"><h2>Build from ticks</h2><p class="muted">Tick what is true for ${esc(first())}. The studio writes it up in flowing sentences, in your voice, and you can reword any sentence.</p><div id="tbBody">${inner()}</div></section>`}
+function paint(){const b=el('tbBody');if(!b)return;const y=window.scrollY;b.innerHTML=inner();window.scrollTo(0,y)}
+const upd=fn=>{const{sem,id}=ctxIds();const t=tick(id,sem);fn(t,id,sem);save();paint()};
+window.tbTog=(id,o)=>{o?openAreas.add(id):openAreas.delete(id)};
+window.tbOv=v=>upd(t=>{t.overall=t.overall===v?0:v});
+window.tbPr=v=>upd((t,id)=>{prons()[id]=v});
+window.tbTone=v=>upd(t=>{t.tone=v});
+window.tbLen=v=>upd(t=>{t.len=v==='ticked'?'ticked':'auto';t.fit=0});
+window.tbHm=(k,i,on)=>upd(t=>{const a=AREAS.find(x=>x.id===k),ph=a.h[i],d=t.areas[k];if(!d||!ph)return;d.hm=(d.hm||[]).filter(x=>x!==ph);if(on)d.hm.push(ph)});
+window.tbQ=(k,l)=>upd(t=>{t.qual[k]===l?delete t.qual[k]:t.qual[k]=l});
+window.tbA=(k,l)=>upd(t=>{if(!l){delete t.areas[k];return}const d=t.areas[k]??={};d.lvl=d.lvl===l?0:l;if(!d.lvl)delete t.areas[k];else openAreas.add(k)});
+window.tbSk=(k,kind,i,on)=>upd(t=>{const a=AREAS.find(x=>x.id===k),ph=skillsOf(a)[i],d=t.areas[k];if(!d||!ph)return;const other=kind==='st'?'nx':'st';d[kind]=(d[kind]||[]).filter(x=>x!==ph);d[other]=(d[other]||[]).filter(x=>x!==ph);if(on)d[kind].push(ph)});
+window.tbEx=(k,v)=>upd(t=>{if(t.areas[k])t.areas[k].ex=String(v).trim()});
+window.tbExtra=v=>upd(t=>{t.extra=String(v).trim()});
+window.tbAdd=k=>{const i=el('tbAdd_'+k);const v=i&&i.value.trim().replace(/[.\s]+$/,'');if(!v)return;const c=custom();c[k]??=[];if(!c[k].includes(v)&&!AREAS.find(a=>a.id===k).sk.includes(v))c[k].push(v);openAreas.add(k);upd(t=>{const d=t.areas[k];if(d){d.st=[...(d.st||[]).filter(x=>x!==v),v]}})};
+window.tbDel=(k,i)=>{const c=custom();const ph=(c[k]||[])[i];if(ph===undefined)return;c[k].splice(i,1);upd(t=>{const d=t.areas[k];if(d){d.st=(d.st||[]).filter(x=>x!==ph);d.nx=(d.nx||[]).filter(x=>x!==ph)}})};
+window.tbSwap=key=>upd(t=>{t.var[key]=((t.var[key]||0)+1)});
+window.tbRegen=()=>upd(t=>{t.seed=(t.seed||1)+1;t.cache={};t.var={}});
+window.tbFit=n=>upd((t,id,sem)=>{if(!n){t.fit=0;return}let f=t.fit||0;const lim=maxLen();do{f++;t.fit=f}while(f<4&&build(id,sem,{fit:f}).text.length>lim)});
+window.tbUse=()=>{const{id,sem}=ctxIds();const r=final(id,sem);const a=el('stComment');if(!a||!r.text)return;if(a.value.trim()&&!confirm('Replace the text in the comment box?'))return;a.value=r.text;stCountComment();a.focus();a.scrollIntoView({block:'center',behavior:'smooth'})};
+
+/* ---------- hook into the Comment builder page ---------- */
+const _cb=stPages['Comment builder'];
+stPages['Comment builder']=()=>{const h=_cb();const c=rpCtx();if(!c.id||h.indexOf('<div class="rp-grid">')<0)return h;return h.replace('<div class="rp-grid">',html()+'<div class="rp-grid">')};
+const css=document.createElement('style');css.textContent=`
+.tb{margin:0 0 18px}.tb h3{margin:18px 0 8px;font-size:15px}.tb h4{margin:14px 0 6px;font-size:13px;color:var(--muted)}
+.tb-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:20px;align-items:start}
+.tb-right{position:sticky;top:12px}.tb-card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--panel)}.tb-card h3{margin-top:0}
+.tb-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:6px 0}.tb-lab{min-width:150px;font-weight:600;font-size:14px}
+.tb-seg{display:inline-flex;flex-wrap:wrap;gap:4px}.tb-seg button,.tb-lvls button{padding:6px 12px;border-radius:99px;font-size:13px;min-height:34px}
+.tb-seg button.on,.tb-lvls button.on{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.tb-area{border:1px solid var(--line);border-radius:12px;margin:6px 0;padding:0 12px;background:var(--panel)}.tb-area summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;cursor:pointer;font-weight:600}
+.tb-pill{font-size:12px;font-weight:600;color:var(--muted);background:var(--soft);padding:3px 10px;border-radius:99px}.tb-pill.on{color:#fff;background:var(--accent)}
+.tb-lvls{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.tb-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0}.tb-cols b{display:block;margin-bottom:4px;font-size:13px}
+.tb-ck{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px;line-height:1.3;cursor:pointer}.tb-ck input{margin-top:3px;flex:0 0 auto}
+.tb-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 12px}.tb-add input{flex:1 1 220px}.tb-add small{flex-basis:100%}
+.tb-home{margin:6px 0 8px;padding:8px 10px;border-radius:10px;background:var(--soft)}.tb-home b{display:block;margin-bottom:2px;font-size:13px}
+.tb-bar{position:relative;height:8px;border-radius:99px;background:var(--soft);margin:12px 0 4px;overflow:hidden}.tb-bar i{position:absolute;top:0;bottom:0;background:color-mix(in srgb,#2e9d66 28%,transparent)}.tb-bar b{position:absolute;left:0;top:0;bottom:0;border-radius:99px}.tb-bar b.ok{background:#2e9d66}.tb-bar b.under{background:#e0a800}.tb-bar b.over{background:#d33}
+.tb-hint{background:var(--soft);border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}.tb-hint ul{margin:4px 0 0;padding-left:18px}
+.tb-prev{font-size:16px;line-height:1.6;min-height:60px}.tb-s{display:inline}.tb-re{border:0!important;background:transparent!important;color:var(--accent)!important;padding:0 4px!important;min-height:0!important;font-size:15px;cursor:pointer;opacity:.55}.tb-s:hover .tb-re,.tb-re:focus{opacity:1}
+.tb-meta{display:flex;justify-content:space-between;gap:8px;margin:10px 0;font-size:13px;font-variant-numeric:tabular-nums}.tb-warn{background:#fff6dd;border:1px solid #f0d58a;border-radius:10px;padding:8px 10px;font-size:13px;color:#6b4e00}
+@media(max-width:900px){.tb-grid{grid-template-columns:1fr}.tb-right{position:static;order:-1}.tb-cols{grid-template-columns:1fr}.tb-lab{min-width:100%}}
+`;document.head.appendChild(css);
 })();
 
 </script>
@@ -2376,7 +2669,7 @@ restore=function(file){if(!file)return;file.text().then(t=>{let x;try{x=JSON.par
  dlg.querySelector('[data-go]').onclick=()=>{download('Teacher-Hub-pre-restore-'+dateISO(new Date())+'.json',JSON.stringify(S,null,2),'application/json');S={...defaults(),...x};migrate(S);lastS=S;save();dlg.close();render()};dlg.showModal()}).catch(()=>alert('That file could not be read.'))};
 
 /* ---------- Version & privacy ---------- */
-const NOTES=['Planner: date-specific drag and drop, undo, per-term timetables, relief teacher PDF','Student profiles: 12-tab central profile, whole-class overview, filtered export','Assessment centre: rubric builder, weighted policies, score/checklist/observation marking, gradebook sync','Classroom board: planner-linked display, tools (random student, groups, noise, dice, chance, angle game, complete the word)','Reporting: evidence-backed comment builder, tracker, class report pack','Curriculum: ACARA V9 code picker, coverage map, planner-driven status updates','Resource studio: validated maths worksheets with answer keys, handwriting, spelling, quick writes','Schema version, migration and validated restore','New “Biro” interface: same sections, new look (biro blue, red margin rule, highlighter-yellow “now” marker). Switch back under Settings › appearance.','Slim or regular sidebar (Settings › ATLAS appearance), quiet planner cards, saved-status pill','Today view on the dashboard with Start lesson, student flags (rule-based), keyboard marking mode, board presets'];
+const NOTES=['Planner: date-specific drag and drop, undo, per-term timetables, relief teacher PDF','Student profiles: 12-tab central profile, whole-class overview, filtered export','Assessment centre: rubric builder, weighted policies, score/checklist/observation marking, gradebook sync','Classroom board: planner-linked display, tools (random student, groups, noise, dice, chance, angle game, complete the word)','Reporting: evidence-backed comment builder, tracker, class report pack','Curriculum: ACARA V9 code picker, coverage map, planner-driven status updates','Resource studio: validated maths worksheets with answer keys, handwriting, spelling, quick writes','Schema version, migration and validated restore','New “Biro” interface: same sections, new look (biro blue, red margin rule, highlighter-yellow “now” marker). Switch back under Settings › appearance.','Slim or regular sidebar (Settings › ATLAS appearance), quiet planner cards, saved-status pill','Today view on the dashboard with Start lesson, student flags (rule-based), keyboard marking mode, board presets','Board: editable headings, hide or show panels, edit in place with a text toolbar','Comment studio: tick qualities, subject levels, strengths, next steps and a real example; the studio writes flowing, varied comments from your ticks'];
 stPages['Version & privacy']=()=>{const x=ext(),st=studio();
  return card('The Teacher Hub',`<p><b>Version ${APP_VERSION}</b> · data schema ${SCHEMA} · stored schema ${e(String(x.schemaVersion||'—'))}</p><p>Last backup: ${e(x.backupDate||'not recorded')} ${!x.backupDate||Date.now()-dateObj(x.backupDate).getTime()>14*864e5?'<span class="notice">Back up now.</span>':''}</p><div class="row">${stBtn('Export complete backup','backup()',true)}${stBtn('Backup & recovery',"stView='';settings='Data & backup';go('Info & Settings')")}</div>`)+
  card('Your data',`<p>${S.students.length} students · ${st.assessments.length} assessments · ${st.rubrics.length} rubrics · ${Object.keys(x.planner?.dates||{}).length} planner dates with changes</p><p>${(x.migrationLog||[]).length?'Migrations: '+x.migrationLog.map(m=>`${e(m.date)} schema ${m.from}→${m.to}`).join(', '):'No migrations recorded.'}</p><p>Migration only adds missing structure. It never deletes records.</p>`)+
