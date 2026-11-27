@@ -2197,7 +2197,8 @@ const OV=[null,'Challenging','Steady','Positive','Very positive','Outstanding'];
 const QL=[null,'Developing','Usually','Consistently'];
 
 /* ---------- content library (Year 3). Skills are single-verb phrases so they can be put into the third person. ---------- */
-const AREAS=[
+const BASE_ALG={id:'alg',h:['spotting and describing patterns around the house','playing games that involve rules and sequences'],g:'Maths',n:'Algebra and patterns',a:'algebra and patterns',sk:['continue number patterns','describe the rule in a pattern','find missing numbers in number sentences','use symbols to represent unknown numbers']};
+const AREAS3=[
  {id:'read',h:['reading together for ten minutes each night','asking questions about what is being read','visiting the library regularly'],g:'English',n:'Reading and viewing',a:'reading and viewing',sk:['read fluently with expression','use context and picture clues to work out unknown words','answer literal and inferential questions about texts','summarise the key ideas in a text','make connections between texts and personal experiences','read texts at an appropriate level with understanding']},
  {id:'write',h:['encouraging regular short writing tasks such as diary entries','talking through ideas together before writing'],g:'English',n:'Writing',a:'writing',sk:['write well-structured texts','use descriptive vocabulary to engage the reader','organise ideas into paragraphs','edit writing for meaning and accuracy','use punctuation accurately, including speech marks','write texts for different purposes and audiences']},
  {id:'spell',h:['practising high-frequency words in short bursts','playing word games together'],g:'English',n:'Spelling and grammar',a:'spelling and grammar',sk:['spell high-frequency words accurately','apply spelling rules and patterns','use sound and word-family knowledge to spell unknown words','use nouns, verbs and adjectives correctly in sentences','vary sentence structure in writing']},
@@ -2216,8 +2217,8 @@ const AREAS=[
  {id:'hpe',h:['encouraging regular physical activity and sport'],g:'Other subjects',n:'Health and Physical Education',a:'Health and Physical Education',sk:['demonstrate fundamental movement skills','show fair play during games and activities','work cooperatively in team games','describe ways to keep healthy and safe']},
  {id:'arts',h:['encouraging drawing, music and creative play'],g:'Other subjects',n:'The Arts',a:'the Arts',sk:['experiment with materials, techniques and ideas','reflect thoughtfully on artworks','share creative work with confidence','explore ideas through visual art, music and drama']},
  {id:'tech',h:['talking about safe and responsible technology use'],g:'Other subjects',n:'Technologies',a:'Technologies',sk:['design solutions to simple problems','follow steps to complete digital tasks','improve designs through testing','use digital tools safely and responsibly']}
-];
-const TRAITS=[
+,BASE_ALG];
+const TRAITS3=[
  {id:'att',n:'Positive attitude',c:['approaches every task with a positive attitude','shows genuine enthusiasm for learning','is eager to take on new challenges'],u:['usually approaches learning positively','generally shows a willingness to try new tasks'],d:['a positive approach to challenging tasks','motivation to start tasks promptly']},
  {id:'eff',n:'Effort and persistence',c:['consistently puts in a strong effort','persists when tasks become challenging','takes pride in the quality of work produced'],u:['generally puts in good effort','usually keeps trying when tasks become difficult'],d:['persistence when tasks are challenging','stamina for completing tasks to a high standard']},
  {id:'col',n:'Collaboration',c:['works cooperatively with classmates','listens respectfully to others','is a reliable group member'],u:['usually works well with a range of peers','generally shares ideas with the group'],d:['skills for working cooperatively in groups','confidence to share and listen in group tasks']},
@@ -2229,6 +2230,140 @@ const TRAITS=[
  {id:'kind',n:'Kindness and friendship',c:['is kind and caring towards others','is a positive role model for peers'],u:['is generally friendly and considerate'],d:['positive friendships and conflict-resolution strategies']}
 ];
 
+/* ---------- year-level library. Year 3 (above) is the base; each year overrides skills (single-verb phrases, no compound verbs), names and family tips. ---------- */
+const YEARS=['F','1','2','3','4','5','6'];
+const YN={F:'Foundation',1:'Year 1',2:'Year 2',3:'Year 3',4:'Year 4',5:'Year 5',6:'Year 6'};
+const YR={
+F:{omit:['frac'],
+ read:{sk:['recognise letters of the alphabet','match letters to their sounds','read simple decodable texts','retell a familiar story','talk about the pictures and characters in a book','hold a book and turn the pages correctly'],h:['sharing a picture book together each night','pointing out letters and signs when out and about','visiting the library regularly']},
+ write:{sk:['write their name correctly','use letters and sounds to attempt a word','draw a picture then label it','write a simple sentence with support','leave spaces between words','begin sentences with a capital letter'],h:['encouraging mark making and drawing with different tools','writing shopping lists or cards together']},
+ spell:{n:'Phonics and word knowledge',a:'phonics and word knowledge',sk:['blend sounds to read simple words','segment sounds to spell simple words','recognise common sight words','identify rhyming words','clap the syllables in a word'],h:['playing rhyming and sound games in the car','practising sight words with flashcards in short bursts']},
+ speak:{sk:['listen carefully to instructions','take turns when talking','share news and ideas with the class','ask and answer simple questions','join in with songs and rhymes'],h:['talking about the day together at dinner','giving short instructions to follow at home']},
+ hand:{sk:['hold a pencil with a comfortable grip','form letters starting in the right place','write letters of consistent size','copy words with care'],h:['practising letter formation with chalk or paint','playing with playdough to build hand strength']},
+ num:{n:'Number and counting',a:'number and counting',sk:['count to 20 and beyond','recognise and write numerals to 10','count a collection accurately','compare two groups of objects','subitise small collections without counting'],h:['counting steps stairs and toys together','looking for numbers on letterboxes and signs']},
+ addsub:{n:'Combining and separating',a:'combining and separating quantities',sk:['combine two groups to find the total','separate a group using objects','solve simple problems using counters','use fingers or drawings to count on','recall number pairs to 5'],h:['adding and removing toys or snacks to talk about more and less','playing simple board games with dice']},
+ muldiv:{n:'Sharing and grouping',a:'sharing and grouping',sk:['share objects equally between friends','make equal groups of objects','explain how items were shared','double small numbers with objects'],h:['sharing snacks fairly and counting how many each','setting the table with one plate per person']},
+ meas:{sk:['compare objects by length','compare objects by mass or capacity','order the days of the week','talk about the time of day using familiar events','sequence daily events'],h:['comparing the size of everyday objects at home','talking about what happens before and after in the day']},
+ geo:{sk:['name common shapes','describe objects using position words','sort shapes by features','build with blocks to make simple models','follow simple directions'],h:['hunting for shapes on a walk','giving and following directions together']},
+ stat:{n:'Data and chance',a:'data and chance',sk:['sort objects into groups','answer yes or no questions to collect data','talk about what is likely or unlikely','show data using objects or pictures'],h:['sorting toys or laundry into groups','talking about what might happen next in games']},
+ reason:{sk:['talk about how they solved a problem','try a different way when stuck','show their thinking with objects or drawings','ask questions when something is unclear'],h:['asking “how did you work that out?” when playing together']},
+ alg:{sk:['copy a simple repeating pattern','continue a repeating pattern','describe a pattern using words','make their own pattern with objects'],h:['making patterns with blocks or food','spotting patterns on clothes and fabric']},
+ sci:{sk:['ask questions about living things','describe what they notice about the world around them','observe changes in weather','share what they have found out'],h:['exploring the garden or park together','talking about the weather each morning']},
+ hass:{sk:['talk about their family and community','describe special places and events','recognise familiar places on a map','compare life today with the past'],h:['talking about family traditions and stories','visiting local places together']},
+ hpe:{sk:['move safely in a shared space','practise throwing catching and kicking','take part in games with fairness','talk about ways to stay healthy'],h:['encouraging active play outside','practising kicking and throwing in the backyard']},
+ arts:{sk:['explore colour and texture in artwork','join in with songs and movement','share their artwork with others','use their imagination in drama and play'],h:['encouraging drawing and singing at home']},
+ tech:{sk:['explore how everyday objects work','follow simple steps to complete a task','use a digital device with support','talk about staying safe when using technology'],h:['talking about safe screen use together']}},
+1:{
+ read:{sk:['read decodable texts with growing fluency','use sounds and pictures to work out new words','recognise a growing bank of sight words','retell the main events of a story','answer questions about a text','read with expression when reading aloud'],h:['reading together each night and taking turns','asking questions about the pictures and story','visiting the library regularly']},
+ write:{sk:['write simple sentences with capital letters and full stops','write about personal experiences','use sounds to spell unfamiliar words','plan writing using pictures or words','add detail to a sentence','reread writing to check it makes sense'],h:['writing short notes or cards to family and friends','talking through ideas together before writing']},
+ spell:{sk:['spell common words accurately','use phonic knowledge to spell new words','recognise digraphs and blends','use capital letters for names','use word endings correctly'],h:['practising sight words in short bursts','playing word games and word hunts together']},
+ speak:{sk:['share ideas clearly with a group','listen to others without interrupting','speak with a clear voice','retell events in order','ask questions to find out more'],h:['talking about the day together at dinner','encouraging a say in family conversations']},
+ hand:{sk:['form letters correctly','keep letters a consistent size','sit letters on the line','leave consistent spaces between words'],h:['practising letter formation for a few minutes each week']},
+ num:{n:'Number and place value',sk:['count to 100 and beyond','read and write numerals to 100','partition two-digit numbers into tens and ones','skip count by 2s 5s and 10s','order numbers to 100'],h:['counting everyday objects together','looking for numbers on signs and in the letterbox']},
+ addsub:{sk:['solve addition problems using objects or drawings','solve subtraction problems using objects or drawings','recall addition facts to 10','count on to add small numbers','use number lines to solve problems'],h:['practising number facts to 10 using games','using toys and snacks to make number stories']},
+ muldiv:{sk:['make equal groups to solve problems','share a collection into equal groups','skip count to find the total','double and halve small numbers'],h:['skip counting while tidying or walking','sharing food equally and talking about how many each']},
+ frac:{sk:['recognise one half of a shape or collection','describe halves using everyday language','share objects into two equal parts','recognise one quarter in a shape'],h:['cutting food into halves and talking about it']},
+ meas:{sk:['measure length using uniform units','compare mass and capacity directly','tell time to the hour and half hour','name the days and months in order','use language of time such as before and after'],h:['measuring objects around the house with hands or blocks','talking about the time on the clock at key points in the day']},
+ geo:{sk:['name and describe two-dimensional shapes','name and describe three-dimensional objects','use position language to describe location','follow and give directions','sort shapes by their features'],h:['spotting shapes around the house','giving and following directions together']},
+ stat:{sk:['collect data by asking questions','organise data using tally marks or pictures','answer questions about simple data displays','describe events as certain or impossible'],h:['collecting and sorting family data such as favourite foods']},
+ reason:{sk:['explain how they solved a problem','try different ways to solve a problem','use materials to show their thinking','check answers by counting again'],h:['asking “how do you know?” when solving problems together']},
+ alg:{sk:['continue repeating and growing patterns','describe patterns using words','find the missing number in a pattern','make and explain their own patterns'],h:['spotting and extending patterns around the house']},
+ sci:{sk:['ask questions about living things and materials','observe and describe changes','record observations using drawings','share what they have learned'],h:['exploring nature together and talking about what you see']},
+ hass:{sk:['describe how places are similar and different','talk about family and community history','use maps and photos to find information','sequence events in order'],h:['talking about local places and family history']},
+ hpe:{sk:['demonstrate basic movement skills','follow rules in games','work with others in group games','talk about healthy choices'],h:['encouraging regular physical activity and sport']},
+ arts:{sk:['experiment with colour and shape in artwork','join in with music and drama activities','share and talk about their own artwork','explore ideas through creative play'],h:['encouraging drawing music and creative play']},
+ tech:{sk:['design a simple solution to a problem','follow a sequence of steps','use a device with growing independence','explain how to stay safe online'],h:['talking about safe and responsible technology use']}},
+2:{
+ read:{sk:['read texts fluently and with expression','use phonic and context clues to read unknown words','answer literal questions about a text','make simple inferences using clues in a text','retell and summarise the main ideas','read texts at an appropriate level with understanding'],h:['reading together each night and discussing the story','encouraging a variety of books and topics','visiting the library regularly']},
+ write:{sk:['write structured texts with a beginning middle and end','use capital letters and full stops accurately','add interesting detail to sentences','plan writing before starting','reread and edit writing','write for different purposes'],h:['encouraging short writing at home such as diary entries','talking through ideas together before writing']},
+ spell:{sk:['spell high-frequency words accurately','use sound patterns to spell new words','apply common spelling rules','use nouns and verbs correctly in sentences','use adjectives to add detail','join ideas using simple conjunctions'],h:['practising spelling words in short bursts','playing word games together']},
+ speak:{sk:['share ideas clearly with a group','listen to others and respond','speak with appropriate volume and expression','explain their thinking to others','take turns in discussions','ask questions to find out more'],h:['talking about the day together at dinner','encouraging a say in family discussions']},
+ hand:{sk:['form letters correctly and consistently','write legibly with correct size and spacing','begin to join letters','present work neatly'],h:['practising letter formation for a few minutes each week']},
+ num:{sk:['work confidently with numbers to 1000','partition numbers using place value','order and compare numbers','skip count in steps of 2 3 5 and 10','estimate and round small numbers'],h:['skip counting during everyday activities','reading large numbers seen on signs and receipts']},
+ addsub:{sk:['solve addition and subtraction problems using efficient strategies','recall addition facts to 20','use mental strategies for two-digit numbers','use number lines and partitioning to solve problems','check answers using the inverse operation'],h:['practising number facts for a few minutes each day','using shopping to solve number problems']},
+ muldiv:{sk:['use equal groups and arrays to solve problems','skip count to solve multiplication problems','share collections equally to solve division problems','recall doubles and halves','recall the 2 5 and 10 times tables'],h:['practising skip counting in short regular bursts','using games and songs to build recall']},
+ frac:{sk:['recognise and name halves quarters and eighths','describe fractions of shapes and collections','share objects into equal parts','represent fractions using models'],h:['cutting food into equal parts to name fractions together']},
+ meas:{sk:['measure length using metres and centimetres','compare mass and capacity using informal units','tell time to the quarter hour','solve problems involving money','order events by their duration'],h:['measuring ingredients and objects at home','talking about time using an analogue clock']},
+ geo:{sk:['describe two-dimensional shapes and three-dimensional objects','use positional language and simple maps','identify symmetry in shapes','describe turns and movements','sort shapes by their features'],h:['spotting shapes around the house','giving and following directions together']},
+ stat:{sk:['collect and organise data','represent data in picture graphs and tables','interpret simple data displays','describe the likelihood of everyday events'],h:['collecting and graphing simple family data','talking about chance during games']},
+ reason:{sk:['explain reasoning using mathematical language','persist with unfamiliar problems','choose strategies to solve problems','justify answers using materials or drawings'],h:['asking “how do you know?” when solving problems together']},
+ alg:{sk:['continue and create number patterns','describe the rule in a pattern','find missing numbers in number sentences','explain how a pattern grows'],h:['spotting and describing patterns around the house']},
+ sci:{sk:['make sensible predictions based on observations','record observations carefully','compare living things and non-living things','share findings with others','explore how materials can be changed'],h:['exploring and talking about nature and everyday science']},
+ hass:{sk:['use sources to answer inquiry questions','describe features of places near and far','explain how places change over time','compare the past and present using evidence'],h:['talking about local places and family history']},
+ hpe:{sk:['demonstrate fundamental movement skills','show fair play during games','work cooperatively in team games','describe ways to keep healthy and safe'],h:['encouraging regular physical activity and sport']},
+ arts:{sk:['experiment with materials techniques and ideas','talk about artworks they have seen','share creative work with confidence','explore ideas through visual art music and drama'],h:['encouraging drawing music and creative play']},
+ tech:{sk:['design solutions to simple problems','follow steps to complete digital tasks','test and improve their designs','use digital tools safely and responsibly'],h:['talking about safe and responsible technology use']}},
+4:{
+ read:{sk:['read fluently with expression','use context to work out the meaning of unknown words','make inferences using evidence from the text','summarise the main ideas of a text','compare ideas across texts','identify the viewpoint of an author'],h:['reading together or independently for twenty minutes each night','asking questions about what is being read','visiting the library regularly']},
+ write:{sk:['write well-structured texts for different purposes','use descriptive vocabulary to engage the reader','organise ideas into paragraphs','use direct speech correctly','edit writing for meaning and accuracy','use evidence to support ideas'],h:['encouraging regular writing such as diary entries','talking through ideas together before writing']},
+ spell:{sk:['spell familiar words accurately','apply spelling rules and word origins','use prefixes and suffixes correctly','use punctuation accurately','vary sentence length and structure','use a range of conjunctions'],h:['practising spelling words in short bursts','playing word games together']},
+ speak:{sk:['present ideas clearly to an audience','listen actively and ask questions','speak with expression and appropriate volume','explain their thinking clearly','build on the ideas of others in discussions'],h:['talking about the day together at dinner','encouraging a say in family discussions']},
+ hand:{sk:['write legibly and fluently','join letters consistently','present work neatly','write at a good pace'],h:['practising neat handwriting for a few minutes each week']},
+ num:{sk:['work confidently with numbers to 100000','partition and rearrange numbers using place value','round and estimate sensibly','count in multiples with ease','recognise odd and even numbers'],h:['skip counting and reading large numbers in everyday settings','talking about prices and quantities when shopping']},
+ addsub:{sk:['solve addition and subtraction problems with larger numbers','use efficient written and mental strategies','recall addition and subtraction facts fluently','check answers using estimation','solve multi-step problems'],h:['practising number facts for a few minutes each day','using shopping or cooking to solve number problems']},
+ muldiv:{sk:['recall multiplication facts up to 10 times 10','use known facts to work out related facts','solve problems involving multiplication and division','use the relationship between multiplication and division','multiply two-digit numbers by one digit'],h:['practising times tables in regular short bursts','using songs games and apps to build recall']},
+ frac:{sk:['order and compare unit fractions','find equivalent fractions using models','add and subtract fractions with the same denominator','read and write decimals to hundredths','find fractions of a collection'],h:['cutting food into equal parts to name fractions together','using recipes to explore fractions']},
+ meas:{sk:['measure length mass and capacity using suitable units','read time on analogue and digital clocks','convert between units of time','calculate perimeter and area','solve problems involving money'],h:['measuring ingredients and objects at home','talking about time and timetables']},
+ geo:{sk:['classify shapes using their features','describe and compare angles','use grid references to locate positions','describe transformations such as flips and turns','identify lines of symmetry'],h:['spotting shapes and angles around the house','giving and following directions together']},
+ stat:{sk:['collect and represent data in tables and graphs','interpret data displays','compare data from different displays','describe the likelihood of events','conduct chance experiments with care'],h:['collecting and graphing simple family data','talking about chance during games']},
+ reason:{sk:['explain reasoning using mathematical language','persist with unfamiliar problems','choose appropriate strategies to solve problems','justify answers with evidence'],h:['asking “how do you know?” when solving problems together']},
+ alg:{sk:['continue and create number patterns','describe the rule in a pattern','find unknown values in number sentences','use number properties to solve problems'],h:['spotting and describing patterns around the house']},
+ sci:{sk:['make sensible predictions based on observations','plan a fair test','record and organise observations carefully','explain findings using evidence','describe how forces affect objects'],h:['exploring and talking about nature and everyday science']},
+ hass:{sk:['use sources to answer inquiry questions','describe the features of places and environments','explain how people have shaped places','compare different perspectives using evidence'],h:['talking about local places and family history']},
+ hpe:{sk:['demonstrate fundamental movement skills','apply strategies in games','show fair play during games and activities','work cooperatively in teams','describe ways to keep healthy and safe'],h:['encouraging regular physical activity and sport']},
+ arts:{sk:['experiment with materials techniques and ideas','reflect thoughtfully on artworks','share creative work with confidence','explore ideas through visual art music and drama'],h:['encouraging drawing music and creative play']},
+ tech:{sk:['design solutions to problems','follow and create algorithms','improve designs through testing','use digital tools safely and responsibly'],h:['talking about safe and responsible technology use']}},
+5:{
+ read:{sk:['read fluently with expression','use context to work out the meaning of unknown words','make inferences using evidence from the text','summarise and analyse the main ideas of a text','compare how ideas are presented in different texts','identify the purpose and viewpoint of an author'],h:['encouraging independent reading for twenty to thirty minutes a night','discussing what is being read and what it makes you think','visiting the library regularly']},
+ write:{sk:['write well-structured texts for different audiences','choose precise vocabulary for effect','organise ideas into paragraphs with a clear focus','support arguments with reasons and evidence','edit writing for meaning and accuracy','plan and draft writing independently'],h:['encouraging regular writing such as journals or letters','discussing writing together and talking through the ideas']},
+ spell:{sk:['spell most words accurately','use spelling rules and word origins','use a range of punctuation accurately','use complex sentences with confidence','vary sentence structure for effect','use the dictionary to check spelling'],h:['practising spelling words in short bursts','playing word games together']},
+ speak:{sk:['present ideas clearly to an audience','listen actively and respond to others','speak with confidence and expression','explain and justify opinions','build on the ideas of others in discussions'],h:['encouraging opinions and reasons at the dinner table','talking about the news or topics of interest together']},
+ hand:{sk:['write legibly and fluently','keep handwriting consistent when writing quickly','present work neatly','develop a personal handwriting style'],h:['encouraging neat handwriting in everyday writing tasks']},
+ num:{sk:['work confidently with numbers beyond 100000','round and estimate sensibly','use place value to order and compare decimals','identify factors and multiples','recognise prime and composite numbers'],h:['talking about large numbers in the news and shops','estimating totals when shopping']},
+ addsub:{sk:['solve addition and subtraction problems with large numbers and decimals','use efficient mental and written strategies','check answers using estimation','solve multi-step problems with confidence'],h:['practising mental strategies in everyday situations','using shopping to solve number problems']},
+ muldiv:{sk:['recall multiplication and division facts fluently','multiply and divide larger numbers using written strategies','solve multi-step problems involving multiplication and division','use the order of operations','solve problems involving factors and multiples'],h:['practising maths facts in regular short bursts','using games and apps to build recall']},
+ frac:{sk:['compare and order fractions with different denominators','add and subtract fractions with related denominators','convert between fractions decimals and percentages','solve problems involving fractions of quantities','solve problems involving money and discounts'],h:['using recipes to explore fractions','talking about fractions decimals and percentages in shops']},
+ meas:{sk:['calculate perimeter and area','measure volume and capacity','convert between metric units','read and interpret timetables','solve problems involving time'],h:['measuring ingredients and objects at home','reading timetables when planning outings']},
+ geo:{sk:['classify angles and measure them with a protractor','describe the features of two-dimensional and three-dimensional shapes','use scale and coordinates to locate positions','describe transformations of shapes','identify and describe symmetry'],h:['spotting shapes and angles around the house','reading maps together']},
+ stat:{sk:['collect and represent data in tables and graphs','interpret and compare data displays','calculate the mean of a data set','describe the probability of events','conduct chance experiments and record results'],h:['collecting and graphing family data','talking about chance and probability during games']},
+ reason:{sk:['explain reasoning using mathematical language','persist with unfamiliar problems','choose efficient strategies to solve problems','justify answers with evidence'],h:['asking “how do you know?” when solving problems together']},
+ alg:{sk:['continue and create number patterns','describe the rule in a pattern','find unknown values in number sentences','use number properties to solve problems','use a rule to predict later terms in a pattern'],h:['spotting and describing patterns around the house']},
+ sci:{sk:['make predictions based on observations','plan and conduct fair tests','record and organise data carefully','explain findings using evidence','describe how light and states of matter behave'],h:['exploring and talking about nature and everyday science']},
+ hass:{sk:['use a range of sources to answer inquiry questions','describe the features of places and societies','explain why events and decisions happened','compare different perspectives using evidence'],h:['talking about local places and family history']},
+ hpe:{sk:['demonstrate refined movement skills','apply strategies in games','show fair play and leadership','work cooperatively in teams','describe ways to keep healthy and safe'],h:['encouraging regular physical activity and sport']},
+ arts:{sk:['experiment with materials techniques and ideas','reflect thoughtfully on artworks','share creative work with confidence','explore ideas through visual art music and drama'],h:['encouraging drawing music and creative play']},
+ tech:{sk:['design and test solutions to problems','follow and create algorithms','improve designs after testing','use digital tools safely and responsibly'],h:['talking about safe and responsible technology use']}},
+6:{
+ read:{sk:['read fluently with expression','use context to work out the meaning of unknown words','make inferences using evidence from the text','analyse the main ideas of a text','evaluate how authors persuade readers','compare how ideas are presented in different texts'],h:['encouraging independent reading for thirty minutes a night','discussing books news and ideas together','visiting the library regularly']},
+ write:{sk:['write well-structured texts for different audiences','choose precise vocabulary for effect','organise ideas into focused paragraphs','support arguments with reasons and evidence','edit and proofread writing independently','plan and draft writing with confidence'],h:['encouraging regular writing such as journals or letters','discussing writing together and talking through the ideas']},
+ spell:{sk:['spell most words accurately','use spelling rules and word origins','use a range of punctuation accurately','use complex and compound sentences with confidence','vary sentence structure for effect','use a dictionary or thesaurus to check words'],h:['practising spelling words in short bursts','playing word games together']},
+ speak:{sk:['present ideas clearly to an audience','listen actively and respond thoughtfully','speak with confidence and expression','explain and justify opinions','build on the ideas of others in discussions'],h:['encouraging opinions and reasons at the dinner table','talking about the news or topics of interest together']},
+ hand:{sk:['write legibly and fluently','keep handwriting consistent when writing quickly','present work neatly','develop a personal handwriting style'],h:['encouraging neat handwriting in everyday writing tasks']},
+ num:{sk:['work confidently with large numbers and decimals','round and estimate sensibly','use place value to order and compare decimals','identify factors and multiples','work with integers in context'],h:['talking about large numbers in the news and shops','estimating totals when shopping']},
+ addsub:{sk:['solve problems with large numbers and decimals','use efficient mental and written strategies','check answers using estimation','solve multi-step problems with confidence'],h:['practising mental strategies in everyday situations','using shopping to solve number problems']},
+ muldiv:{sk:['recall multiplication and division facts fluently','multiply and divide larger numbers using written strategies','solve multi-step problems involving multiplication and division','use the order of operations','solve problems involving factors and multiples'],h:['practising maths facts in regular short bursts','using games and apps to build recall']},
+ frac:{sk:['compare and order fractions and decimals','add and subtract fractions with different denominators','convert between fractions decimals and percentages','solve problems involving fractions of quantities','solve problems involving ratios and rates'],h:['using recipes to explore fractions','talking about fractions decimals and percentages in shops']},
+ meas:{sk:['calculate perimeter area and volume','convert between metric units','read and interpret timetables','solve problems involving time zones','solve problems involving speed and distance'],h:['measuring and calculating with recipes and building projects','reading timetables when planning outings']},
+ geo:{sk:['classify angles and measure them accurately','describe the features of two-dimensional and three-dimensional shapes','use coordinates and scale to locate positions','describe and perform transformations','construct shapes using ruler and protractor'],h:['spotting shapes and angles around the house','reading maps together']},
+ stat:{sk:['collect and represent data in tables and graphs','interpret and compare data displays','calculate the mean median and mode','describe the probability of events','design and carry out chance experiments'],h:['collecting and graphing family data','talking about chance and probability during games']},
+ reason:{sk:['explain reasoning using mathematical language','persist with unfamiliar problems','choose efficient strategies to solve problems','justify answers with evidence'],h:['asking “how do you know?” when solving problems together']},
+ alg:{sk:['continue and create number patterns','describe the rule in a pattern','find unknown values in number sentences','use number properties to solve problems','use a rule to predict later terms in a pattern'],h:['spotting and describing patterns around the house']},
+ sci:{sk:['make predictions based on observations','plan and conduct fair tests','record and organise data carefully','explain findings using evidence','describe how energy and living things interact'],h:['exploring and talking about nature and everyday science']},
+ hass:{sk:['use a range of sources to answer inquiry questions','describe the features of places and societies','explain why events and decisions happened','compare different perspectives using evidence'],h:['talking about local places and family history']},
+ hpe:{sk:['demonstrate refined movement skills','apply strategies in games','show fair play and leadership','work cooperatively in teams','describe ways to keep healthy and safe'],h:['encouraging regular physical activity and sport']},
+ arts:{sk:['experiment with materials techniques and ideas','reflect thoughtfully on artworks','share creative work with confidence','explore ideas through visual art music and drama'],h:['encouraging drawing music and creative play']},
+ tech:{sk:['design and test solutions to problems','follow and create algorithms','improve designs after testing','use digital tools safely and responsibly'],h:['talking about safe and responsible technology use']}}
+};
+
+const BASE_TRAITS_EXTRA=[
+ {id:'rout',n:'Classroom routines',min:0,max:2,c:['follows classroom routines with growing confidence','settles quickly into the day','packs away and gets ready independently'],u:['usually follows classroom routines','generally settles well at the start of the day'],d:['familiarity with classroom routines','settling quickly into learning times']},
+ {id:'lead',n:'Leadership and responsibility',min:5,max:6,c:['takes on leadership roles with maturity','is a thoughtful role model for younger students','takes initiative and responsibility around the school'],u:['is beginning to take on leadership opportunities'],d:['confidence in taking on leadership opportunities']}
+];
+const yrNum=y=>y==='F'?0:+y;
+function yr(){const x=ext();let y=String(x.commentYear||x.yearLevel||'3').trim().toUpperCase().replace(/^YEAR\s*/,'');if(y==='0'||y==='FOUNDATION'||y==='PREP'||y==='RECEPTION')y='F';return YEARS.includes(y)?y:'3'}
+const _are={};
+function ARE(y){y=y||yr();if(_are[y])return _are[y];const o=YR[y]||{};const list=AREAS3.filter(a=>!(o.omit||[]).includes(a.id)).map(a=>{const x=o[a.id];return x?Object.assign({},a,{sk:x.sk||a.sk,h:x.h||a.h,n:x.n||a.n,a:x.a||a.a}):a});return _are[y]=list}
+function TR(){const n=yrNum(yr());return TRAITS3.concat(BASE_TRAITS_EXTRA.filter(t=>n>=t.min&&n<=t.max))}
 /* ---------- sentence patterns. {N} name, {s} he/she/name, {S} same, capitalised, {p} his/her, {A} area, {st} third-person strengths, {nx} next steps, {ex} example ---------- */
 const BANK={
  warm:{
@@ -2290,9 +2425,11 @@ const BANK={
 
 /* ---------- helpers ---------- */
 const IRR={have:'has',do:'does',go:'goes'};
-function v3(base){const w=String(base).trim().split(' ');const v=w[0].toLowerCase();let o;
- if(IRR[v])o=IRR[v];else if(/(s|x|z|ch|sh)$/.test(v))o=v+'es';else if(/[^aeiou]y$/.test(v))o=v.slice(0,-1)+'ies';else o=v+'s';
- w[0]=o;return w.join(' ')}
+const V2=new Set(['analyse','name','write','organise','subtract','divide','order','represent','measure','test','create','proofread','draft','respond','conduct','compare','record','perform','interpret','plan','edit','separate','make','read','recognise','describe','use','explain','summarise','improve','retell']);
+const to3=v=>IRR[v]?IRR[v]:/(s|x|z|ch|sh)$/.test(v)?v+'es':/[^aeiou]y$/.test(v)?v.slice(0,-1)+'ies':v+'s';
+function v3(base){const w=String(base).trim().split(' ');w[0]=to3(w[0].toLowerCase());
+ for(let i=1;i<Math.min(w.length-1,4);i++)if(w[i]==='and'&&V2.has(w[i+1])&&!/^(the|a|an)$/.test(w[i-1])){w[i+1]=to3(w[i+1]);break}
+ return w.join(' ')}
 const join=a=>{const sep=a.some(x=>x.includes(','))?'; ':', ';return a.length<2?(a[0]||''):a.slice(0,-1).join(sep)+' and '+a[a.length-1]};
 const capFirst=s=>s.replace(/^(\W*)([a-z])/,(m,a,b)=>a+b.toUpperCase());
 const fixEnd=s=>{s=s.replace(/\s+/g,' ').replace(/\s+([.,;:])/g,'$1').trim();return /[.!?]$/.test(s)?s:s+'.'};
@@ -2321,7 +2458,7 @@ function build(id,sem,o={}){
  const fill=(f,o)=>f.replace(/\{N\}/g,N).replace(/\{s\}/g,P.s).replace(/\{S\}/g,capFirst(P.s)).replace(/\{p\}/g,P.p).replace(/\{T\}/g,T).replace(/\{A\}/g,o.A||'').replace(/\{st\}/g,o.st||'').replace(/\{nx\}/g,o.nx||'').replace(/\{ex\}/g,o.ex||'').replace(/\{pl\}/g,o.pl||'').replace(/\{dl\}/g,o.dl||'').replace(/\{hm\}/g,o.hm||'');
  const usable=bank=>{const u=bank.filter(f=>(P.p||!f.includes('{p}'))&&!(ctx.multi&&/\{A\} (is|are)\b/.test(f)));const fresh=u.filter(f=>!ctx.used.has(f));return fresh.length?fresh:u};
  const out=[];
- if(!(t.overall||Object.keys(t.qual).length||AREAS.some(a=>(t.areas[a.id]||{}).lvl)||String(t.extra||'').trim()))return{sentences:[],text:''};
+ if(!(t.overall||Object.keys(t.qual).length||ARE().some(a=>(t.areas[a.id]||{}).lvl)||String(t.extra||'').trim()))return{sentences:[],text:''};
  function sentence(key,kind,sigData,gen,g){
   const v=(t.var||{})[key]||0;const sig=JSON.stringify([sigData,tone,pr,t.seed,v,fit]);const c=t.cache[key];let text;
   if(c&&c.sig===sig)text=c.text;
@@ -2332,7 +2469,7 @@ function build(id,sem,o={}){
  /* opener */
  if(t.overall&&B.open[t.overall])sentence('open','Opening',[t.overall],r=>frame(r,B.open[t.overall],{}));
  /* qualities */
- const byLvl={3:[],2:[],1:[]};for(const tr of TRAITS){const l=t.qual[tr.id];if(l)byLvl[l].push(tr)}
+ const byLvl={3:[],2:[],1:[]};for(const tr of TR()){const l=t.qual[tr.id];if(l)byLvl[l].push(tr)}
  const items=(list,lvl)=>list.map(tr=>pick(rng([id,sem,t.seed,tr.id,lvl].join('|')),lvl===3?tr.c:lvl===2?tr.u:tr.d));
  let hadPos=false,qleft=fit>=5?3:fit>=2?4:99;
  for(const lvl of [3,2]){const L=byLvl[lvl].slice(0,qleft);if(!L.length)continue;qleft-=L.length;const pls=items(L,lvl);hadPos=true;
@@ -2340,7 +2477,7 @@ function build(id,sem,o={}){
  if(byLvl[1].length&&(fit<3||!hadPos)){const dls=items(byLvl[1],1);chunk(dls,3).forEach((c,i)=>sentence('q1-'+i,'Qualities',[c,hadPos],r=>frame(r,hadPos&&i===0?B.qda:B.qd,{dl:join(c)})))}
  if(layers>=2&&hadPos&&byLvl[3].length&&t.overall>=3)sentence('impact','Qualities',[1],r=>frame(r,B.impact,{}));
  /* subject areas */
- const chosen=AREAS.filter(a=>(t.areas[a.id]||{}).lvl);
+ const chosen=ARE().filter(a=>(t.areas[a.id]||{}).lvl);
  const plain={4:[],3:[],2:[],1:[]},rich=[];
  for(const a of chosen){const d=t.areas[a.id];const stg=(d.st||[]).filter(x=>skillsOf(a).includes(x)),nxs=(d.nx||[]).filter(x=>skillsOf(a).includes(x));const ex=exFrag(d.ex);
   if((!stg.length&&!nxs.length&&!ex)||(fit>=6&&rich.length>=2))plain[d.lvl].push(a);else rich.push({a,d,stg:fit>=5?stg.slice(0,1):fit>=1?stg.slice(0,2):stg,nxs:fit>=5?(rich.length<2?nxs.slice(0,1):[]):fit>=3?nxs.slice(0,1):nxs,ex})}
@@ -2370,7 +2507,12 @@ function build(id,sem,o={}){
  const startsName=x=>x.startsWith(N+' ');
  const seen={};let any=false;
  out.forEach((x,i)=>{if(x.g){if(!seen[x.g]){seen[x.g]=1;if(x.g!=='English'&&any&&/^In /.test(texts[i])&&!/^In (Maths|English)/.test(texts[i])){texts[i]=pick(rng([id,sem,t.seed,'bridge',x.g].join('|')),['Turning to ','Moving on to '])+texts[i].slice(3)}else if(startsName(texts[i])&&(any||x.g!=='English')){const r=rng([id,sem,t.seed,'bridge',x.g].join('|'));const opts=x.g==='English'?['In English, ']:x.g==='Maths'?['In Maths, ','Turning to Maths, ','Moving on to Maths, ']:['Across the wider curriculum, ','In other areas of the curriculum, '];if(out.filter(y=>y.g).length>1||x.g!=='English')texts[i]=pick(r,opts)+texts[i]}}any=true}});
- if(P.p)for(let i=1;i<texts.length;i++){if(startsName(texts[i])&&startsName(texts[i-1]))texts[i]=capFirst(P.s)+texts[i].slice(N.length)}
+ /* name and he/she: alternate the subject so the name is not repeated every sentence */
+ if(P.p){const esc2=N.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');const re=new RegExp('^((?:.{0,60}?, )?)'+esc2+'(?= )');const pre=new RegExp('^(He|She) ');let nameSubj=false;
+  for(let i=0;i<texts.length;i++){const x=texts[i];
+   if(pre.test(x)){nameSubj=false;continue}
+   const m=re.exec(x);if(!m)continue;
+   if(nameSubj){texts[i]=m[1]+(m[1]?P.s:capFirst(P.s))+x.slice(m[0].length);nameSubj=false}else nameSubj=true}}
  out.forEach((x,i)=>x.text=texts[i]);
  return{sentences:out,text:out.map(x=>x.text).join(' ')}}
 /* length: aim for 900 to 1200 characters unless the teacher asks for exactly what was ticked */
@@ -2382,7 +2524,7 @@ function final(id,sem){const t=tick(id,sem);
   if(!ok&&pick.L>0){for(let f=0;f<=6&&!ok;f++){const r=build(id,sem,{layers:pick.L-1,fit:f});if(r.text.length<=MAX)ok={r,L:pick.L-1,fit:f}}}
   if(ok)pick=ok;else{const r=build(id,sem,{layers:0,fit:6});pick={r,L:0,fit:6}}}
  return Object.assign(pick.r,{layers:pick.L,fit:pick.fit,mode:'auto'})}
-function hints(id,sem){const t=tick(id,sem),h=[];const ch=AREAS.filter(a=>(t.areas[a.id]||{}).lvl);
+function hints(id,sem){const t=tick(id,sem),h=[];const ch=ARE().filter(a=>(t.areas[a.id]||{}).lvl);
  if(!t.overall)h.push('Choose an overall impression.');
  if(Object.keys(t.qual).length<3)h.push('Tick a few more learner qualities.');
  if(!ch.length)h.push('Choose levels for English and Maths.');
@@ -2404,8 +2546,8 @@ const openAreas=new Set();
 const first=()=>{const{id}=ctxIds();const s=S.students.find(x=>x.id===id);return s?String(s.name).split(' ')[0]:''};
 function seg(label,opts,cur,fn){return `<div class="tb-seg" role="group" aria-label="${esc(label)}">${opts.map(([v,t])=>`<button type="button" aria-pressed="${cur===v}" class="${cur===v?'on':''}" onclick="${fn}(${typeof v==='string'?`'${v}'`:v})">${esc(t)}</button>`).join('')}</div>`}
 function inner(){const{sem,id}=ctxIds();const t=tick(id,sem),pr=prons()[id]||'';const res=final(id,sem);const lim=maxLen();const n=res.text.length;const hs=n<MIN?hints(id,sem):[];const sim=similar(id,sem,res.text);
- const traits=TRAITS.map(tr=>`<div class="tb-row"><span class="tb-lab">${esc(tr.n)}</span><div class="tb-seg" role="group" aria-label="${esc(tr.n)}">${[3,2,1].map(l=>`<button type="button" aria-pressed="${t.qual[tr.id]===l}" class="${t.qual[tr.id]===l?'on':''}" onclick="tbQ('${tr.id}',${l})">${QL[l]}</button>`).join('')}</div></div>`).join('');
- const groups=['English','Maths','Other subjects'].map(g=>`<h4>${g}</h4>`+AREAS.filter(a=>a.g===g).map(a=>{const d=t.areas[a.id]||{};const sk=skillsOf(a),cust=custom()[a.id]||[];
+ const traits=TR().map(tr=>`<div class="tb-row"><span class="tb-lab">${esc(tr.n)}</span><div class="tb-seg" role="group" aria-label="${esc(tr.n)}">${[3,2,1].map(l=>`<button type="button" aria-pressed="${t.qual[tr.id]===l}" class="${t.qual[tr.id]===l?'on':''}" onclick="tbQ('${tr.id}',${l})">${QL[l]}</button>`).join('')}</div></div>`).join('');
+ const groups=['English','Maths','Other subjects'].map(g=>`<h4>${g}</h4>`+ARE().filter(a=>a.g===g).map(a=>{const d=t.areas[a.id]||{};const sk=skillsOf(a),cust=custom()[a.id]||[];
   const body=d.lvl?`<div class="tb-cols"><div><b>Doing well</b>${sk.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.st||[]).includes(x)?'checked':''} onchange="tbSk('${a.id}','st',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div><div><b>Next step</b>${sk.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.nx||[]).includes(x)?'checked':''} onchange="tbSk('${a.id}','nx',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div></div>
    <div class="tb-home"><b>How families can help</b>${a.h.map((x,i)=>`<label class="tb-ck"><input type="checkbox" ${(d.hm||[]).includes(x)?'checked':''} onchange="tbHm('${a.id}',${i},this.checked)"> <span>${esc(x)}</span></label>`).join('')}</div>
    <label class="field">A real example (optional)<input value="${esc(d.ex||'')}" maxlength="160" placeholder="e.g. during the class garden project, or when explaining the fractions task" onchange="tbEx('${a.id}',this.value)"></label>
@@ -2414,7 +2556,8 @@ function inner(){const{sem,id}=ctxIds();const t=tick(id,sem),pr=prons()[id]||'';
  const prev=res.sentences.length?res.sentences.map(s=>`<span class="tb-s" title="${esc(s.kind)}">${esc(s.text)}${s.key==='extra'?'':` <button type="button" class="tb-re" aria-label="Reword this sentence" title="Reword this sentence" onclick="tbSwap('${esc(s.key)}')">↻</button>`}</span>`).join(' '):'<p class="muted">Tick an overall impression, some qualities or a subject level and the comment appears here.</p>';
  return `<div class="tb-grid"><div class="tb-left">
   <h3>1 · Overall</h3><div class="tb-row"><span class="tb-lab">This ${rpCtx().sem==='2'?'year':'semester'} was</span>${seg('Overall impression',[[5,'Outstanding'],[4,'Very positive'],[3,'Positive'],[2,'Steady'],[1,'Challenging']],t.overall,'tbOv')}</div>
-  <div class="tb-row"><span class="tb-lab">Refer to ${esc(first())} as</span>${seg('Pronoun',[['he','He'],['she','She'],['','Name only']],pr,'tbPr')}</div>
+  <div class="tb-row"><span class="tb-lab">Refer to ${esc(first())} as</span>${seg('Pronoun',[['he','Name and he'],['she','Name and she'],['','Name only']],pr,'tbPr')}</div>
+  <div class="tb-row"><span class="tb-lab">Year level</span>${seg('Year level',YEARS.map(y=>[y,y==='F'?'Foundation':'Year '+y]),yr(),'tbYear')}</div>
   <div class="tb-row"><span class="tb-lab">Tone</span>${seg('Tone',[['warm','Warm'],['formal','Formal']],t.tone,'tbTone')}</div>
   <div class="tb-row"><span class="tb-lab">Length</span>${seg('Length',[['auto','Aim for 900–1200'],['ticked','Just what I ticked']],t.len==='ticked'?'ticked':'auto','tbLen')}</div>
   <h3>2 · Learner qualities</h3><p class="muted">Tick how consistently each is true. Leave blank to skip.</p>${traits}
@@ -2434,14 +2577,16 @@ window.tbTog=(id,o)=>{o?openAreas.add(id):openAreas.delete(id)};
 window.tbOv=v=>upd(t=>{t.overall=t.overall===v?0:v});
 window.tbPr=v=>upd((t,id)=>{prons()[id]=v});
 window.tbTone=v=>upd(t=>{t.tone=v});
+window.tbAreas=y=>ARE(y);window.tbV3=v3;
+window.tbYear=v=>{if(!YEARS.includes(String(v)))return;ext().commentYear=String(v);save();paint()};
 window.tbLen=v=>upd(t=>{t.len=v==='ticked'?'ticked':'auto';t.fit=0});
-window.tbHm=(k,i,on)=>upd(t=>{const a=AREAS.find(x=>x.id===k),ph=a.h[i],d=t.areas[k];if(!d||!ph)return;d.hm=(d.hm||[]).filter(x=>x!==ph);if(on)d.hm.push(ph)});
+window.tbHm=(k,i,on)=>upd(t=>{const a=ARE().find(x=>x.id===k),ph=a.h[i],d=t.areas[k];if(!d||!ph)return;d.hm=(d.hm||[]).filter(x=>x!==ph);if(on)d.hm.push(ph)});
 window.tbQ=(k,l)=>upd(t=>{t.qual[k]===l?delete t.qual[k]:t.qual[k]=l});
 window.tbA=(k,l)=>upd(t=>{if(!l){delete t.areas[k];return}const d=t.areas[k]??={};d.lvl=d.lvl===l?0:l;if(!d.lvl)delete t.areas[k];else openAreas.add(k)});
-window.tbSk=(k,kind,i,on)=>upd(t=>{const a=AREAS.find(x=>x.id===k),ph=skillsOf(a)[i],d=t.areas[k];if(!d||!ph)return;const other=kind==='st'?'nx':'st';d[kind]=(d[kind]||[]).filter(x=>x!==ph);d[other]=(d[other]||[]).filter(x=>x!==ph);if(on)d[kind].push(ph)});
+window.tbSk=(k,kind,i,on)=>upd(t=>{const a=ARE().find(x=>x.id===k),ph=skillsOf(a)[i],d=t.areas[k];if(!d||!ph)return;const other=kind==='st'?'nx':'st';d[kind]=(d[kind]||[]).filter(x=>x!==ph);d[other]=(d[other]||[]).filter(x=>x!==ph);if(on)d[kind].push(ph)});
 window.tbEx=(k,v)=>upd(t=>{if(t.areas[k])t.areas[k].ex=String(v).trim()});
 window.tbExtra=v=>upd(t=>{t.extra=String(v).trim()});
-window.tbAdd=k=>{const i=el('tbAdd_'+k);const v=i&&i.value.trim().replace(/[.\s]+$/,'');if(!v)return;const c=custom();c[k]??=[];if(!c[k].includes(v)&&!AREAS.find(a=>a.id===k).sk.includes(v))c[k].push(v);openAreas.add(k);upd(t=>{const d=t.areas[k];if(d){d.st=[...(d.st||[]).filter(x=>x!==v),v]}})};
+window.tbAdd=k=>{const i=el('tbAdd_'+k);const v=i&&i.value.trim().replace(/[.\s]+$/,'');if(!v)return;const c=custom();c[k]??=[];if(!c[k].includes(v)&&!ARE().find(a=>a.id===k).sk.includes(v))c[k].push(v);openAreas.add(k);upd(t=>{const d=t.areas[k];if(d){d.st=[...(d.st||[]).filter(x=>x!==v),v]}})};
 window.tbDel=(k,i)=>{const c=custom();const ph=(c[k]||[])[i];if(ph===undefined)return;c[k].splice(i,1);upd(t=>{const d=t.areas[k];if(d){d.st=(d.st||[]).filter(x=>x!==ph);d.nx=(d.nx||[]).filter(x=>x!==ph)}})};
 window.tbSwap=key=>upd(t=>{t.var[key]=((t.var[key]||0)+1)});
 window.tbRegen=()=>upd(t=>{t.seed=(t.seed||1)+1;t.cache={};t.var={}});
