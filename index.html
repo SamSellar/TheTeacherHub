@@ -1932,8 +1932,8 @@ const presets=()=>[...BUILTIN,...(bs().presets||[])];
 let restored=null;
 function restoreState(){if(restored===S)return;restored=S;const st=bs().state;if(!st)return;if(Number.isInteger(st.noise)&&st.noise>=0&&st.noise<4)BD.noise=st.noise;if(Array.isArray(st.labels)&&st.labels.length>=2)BD.chance.labels=st.labels;if(['vowels','first','last','random'].includes(st.hide))BD.word.hide=st.hide}
 function persist(){bs().state={tool:BD.tool,noise:BD.noise,labels:BD.chance.labels,hide:BD.word.hide};save()}
-window.bdPreset=id=>{const p=presets().find(x=>x.id===id);if(!p)return;const b=studio().board;b.layout=p.layout||b.layout;if(p.design&&boardDesigns[p.design])b.design=p.design;b.minutes=p.minutes||b.minutes;bs().linked=!!p.linked;a2().boardHidden=[...(p.hidden||[])];bs().labels={...(p.labels||{})};bs().title=p.title||'';BD.tool=p.tool||'';if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);if(typeof stResetTimer==='function')stResetTimer();persist();render();if(typeof stTimerDraw==='function')stTimerDraw()};
-window.bdPresetSave=()=>{stDialog('Save board preset',stField('Preset name','bdPn',''),()=>{const n=stVal('bdPn').trim();if(!n){alert('Enter a name.');return false}const b=studio().board;(bs().presets??=[]).push({id:uid(),name:n,layout:b.layout,design:b.design,minutes:b.minutes,linked:!!bs().linked,hidden:[...a2().boardHidden],labels:{...(bs().labels||{})},title:bs().title||'',tool:BD.tool});setTimeout(render,0)})};
+window.bdPreset=id=>{const p=presets().find(x=>x.id===id);if(!p)return;const b=studio().board;b.layout=p.layout||b.layout;if(p.design&&boardDesigns[p.design])b.design=p.design;b.minutes=p.minutes||b.minutes;bs().linked=!!p.linked;a2().boardHidden=[...(p.hidden||[])];bs().labels={...(p.labels||{})};bs().fmt=JSON.parse(JSON.stringify(p.fmt||{}));bs().title=p.title||'';BD.tool=p.tool||'';if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);if(typeof stResetTimer==='function')stResetTimer();persist();render();if(typeof stTimerDraw==='function')stTimerDraw()};
+window.bdPresetSave=()=>{stDialog('Save board preset',stField('Preset name','bdPn',''),()=>{const n=stVal('bdPn').trim();if(!n){alert('Enter a name.');return false}const b=studio().board;(bs().presets??=[]).push({id:uid(),name:n,layout:b.layout,design:b.design,minutes:b.minutes,linked:!!bs().linked,hidden:[...a2().boardHidden],labels:{...(bs().labels||{})},fmt:JSON.parse(JSON.stringify(bs().fmt||{})),title:bs().title||'',tool:BD.tool});setTimeout(render,0)})};
 window.bdPresetDel=id=>{bs().presets=(bs().presets||[]).filter(x=>x.id!==id);save();render()};
 const nmById=id=>{const i=S.students.findIndex(s=>s.id===id);return i<0?'':nm(S.students[i],i)};
 
@@ -1963,7 +1963,7 @@ stBoard=function(){const root=ext().studio12,orig=root.board;
  if(bs().linked){const{cur,next}=lessonNow();root.board={...orig,intention:cur?.li||orig.intention,criteria:cur?.sc||orig.criteria,task:cur?(cur.independent||cur.focus||orig.task):orig.task,next:next?(next.name||next.subject):orig.next}}
  let html;try{html=_stBoard()}finally{root.board=orig}
  html=relabel(html);restoreState();const tools=`<nav class="bd-tools" aria-label="Board tools"><select aria-label="Board preset" onchange="bdPreset(this.value);this.value=''"><option value="">Preset…</option>${presets().map(p=>`<option value="${e(p.id)}">${e(p.name)}</option>`).join('')}</select>${b0btn()}${TOOLS.map(([k,l])=>`<button type="button" class="${BD.tool===k?'on':''}" onclick="bdTool('${k}')">${e(l)}</button>`).join('')}</nav>`;
- html=html.replace('<div class="bd-grid">',tools+'<div class="bd-grid">');
+ html=html.replace('<div class="bd-grid">',tools+(BD.edit?rteBar():'')+'<div class="bd-grid">');
  if(BD.tool)html=html.replace(/<\/div>$/,`<div class="bd-overlay" role="dialog" aria-label="${e(TOOLS.find(t=>t[0]===BD.tool)[1])}"><div class="bd-ohead"><h2>${e(TOOLS.find(t=>t[0]===BD.tool)[1])}</h2>${b('Close','bdTool(\'\')')}</div><div class="bd-obody">${toolHTML(BD.tool)}</div></div></div>`);
  return html};
 window.bdTool=k=>{restoreState();BD.tool=BD.tool===k?'':k;persist();if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);render();if(typeof stTimerDraw==='function')stTimerDraw()};
@@ -2049,25 +2049,47 @@ function classroomForm(html){
 function b0btn(){return `<button type="button" class="bd-editbtn ${BD.edit?'on':''}" onclick="bdEdit()">${BD.edit?'Done editing':'Edit board'}</button>${BD.edit?'<button type="button" onclick="bdPresetSave()">Save as preset</button>':''}`}
 window.bdEdit=()=>{BD.edit=!BD.edit;render();if(typeof stTimerDraw==='function')stTimerDraw()};
 const txt=el0=>((/^H[12]$/.test(el0.tagName)?el0.textContent:(el0.innerText??el0.textContent))).replace(/\u00a0/g,' ').replace(/\n+$/,'');
-function decorateEdit(){if(!BD.edit||!document.body.classList.contains('board'))return;
+const SIZES=[.6,.75,.9,1,1.25,1.5,1.8,2.2,2.8];
+const OKT=new Set(['B','STRONG','I','EM','U','UL','OL','LI','BR','DIV','P','SPAN']);
+const COLOR=/^(#[0-9a-f]{3,8}|rgb\([\d\s,.]+\))$/i;
+function clean(node){const out=document.createElement('div');(function walk(src,dst){for(const n of src.childNodes){if(n.nodeType===3){dst.appendChild(document.createTextNode(n.textContent));continue}if(n.nodeType!==1)continue;let t=n.tagName;
+  if(t==='FONT'){const c=document.createElement('span');const col=n.getAttribute('color');if(col&&COLOR.test(col))c.style.color=col;walk(n,c);dst.appendChild(c);continue}
+  if(!OKT.has(t)){walk(n,dst);continue}const c=document.createElement(t);const col=n.style&&n.style.color;if(col&&COLOR.test(col)&&t==='SPAN')c.style.color=col;walk(n,c);dst.appendChild(c)}})(node,out);return out.innerHTML}
+const fmtOf=k=>(bs().fmt||{})[k]||{};
+function paintFmt(k){const sec=document.querySelector('.bd-panel.bd-'+k);if(!sec)return;const f=fmtOf(k),p=sec.querySelector('.st-board-text');sec.style.setProperty('--bsz',f.size||1);if(p){p.style.columnCount=f.cols>1?f.cols:'';p.style.columnGap=f.cols>1?'1.5em':'';p.style.textAlign=f.align==='center'?'center':''}}
+function rteBar(){const btn=(label,act,tip,cls='')=>`<button type="button" class="${cls}" title="${tip}" aria-label="${tip}" onmousedown="event.preventDefault()" onclick="${act}">${label}</button>`;
+ const cols=['#2338c4','#c62828','#2e7d32','#e07b00'].map(c=>btn('<i style="background:'+c+'"></i>',"bdCmd('foreColor','"+c+"')",'Text colour','bd-sw')).join('');
+ return `<div class="bd-rte" role="toolbar" aria-label="Text formatting"><span class="bd-rl">${BD.focus?'Formatting: '+e(lbl(BD.focus)||(PANELS.find(x=>x[0]===BD.focus)||[])[1]||''):'Click into a panel’s text to format it'}</span>${btn('A−','bdSize(-1)','Smaller text')}${btn('A+','bdSize(1)','Larger text')}${btn('<b>B</b>',"bdCmd('bold')",'Bold')}${btn('<i>I</i>',"bdCmd('italic')",'Italic')}${btn('<u>U</u>',"bdCmd('underline')",'Underline')}${btn('• List',"bdCmd('insertUnorderedList')",'Bullet list')}${btn('1. List',"bdCmd('insertOrderedList')",'Numbered list')}${btn('1 col','bdCols(1)','One column')}${btn('2 col','bdCols(2)','Two columns')}${btn('3 col','bdCols(3)','Three columns')}${btn('Left','bdAlign(\'left\')','Align left')}${btn('Centre','bdAlign(\'center\')','Centre')}${cols}${btn('Clear',"bdCmd('removeFormat')",'Clear formatting')}</div>`}
+window.bdCmd=(c,v)=>{if(!BD.focus){return}document.execCommand('styleWithCSS',false,c==='foreColor');document.execCommand(c,false,v||null);document.execCommand('styleWithCSS',false,false)};
+const setF=(k,o)=>{if(!k)return;const f=(bs().fmt??={})[k]??={};Object.assign(f,o);save();paintFmt(k)};
+window.bdSize=d=>{const k=BD.focus;if(!k)return;let i=SIZES.indexOf(fmtOf(k).size??1);if(i<0)i=3;setF(k,{size:SIZES[Math.max(0,Math.min(SIZES.length-1,i+d))]})};
+window.bdCols=n=>setF(BD.focus,{cols:n});window.bdAlign=a=>setF(BD.focus,{align:a});
+function decorateBoard(){if(!document.body.classList.contains('board')||!document.querySelector('.bd-panel'))return;
+ const board=studio().board,rich=board.rich||{};
+ for(const [k,def,fallback,field] of PANELS){const sec=document.querySelector('.bd-panel.bd-'+k);if(!sec)continue;paintFmt(k);const p=sec.querySelector('.st-board-text');if(p&&field&&rich[field]&&!bs().linked)p.innerHTML=clean((()=>{const d=document.createElement('div');d.innerHTML=rich[field];return d})())}
+ if(!BD.edit)return;
  const mode=(()=>{const t=document.createElement('div');t.contentEditable='plaintext-only';return t.contentEditable==='plaintext-only'?'plaintext-only':'true'})();
- const mk=(n,o)=>{n.contentEditable=mode;n.spellcheck=true;n.classList.add('bd-ed');for(const k in o)n.dataset[k]=o[k]};
- const board=studio().board;
+ const mk=(n,o,m)=>{n.contentEditable=m||mode;n.spellcheck=true;n.classList.add('bd-ed');for(const k in o)n.dataset[k]=o[k]};
  for(const [k,def,fallback,field] of PANELS){const sec=document.querySelector('.bd-panel.bd-'+k);if(!sec||!field)continue;
   const h=sec.querySelector('h2'),p=sec.querySelector('.st-board-text');if(h)mk(h,{bdl:k,def});
-  if(p){if(!(board[field]||'').trim()&&p.textContent.trim()===fallback)p.textContent='';mk(p,{bdf:field,ph:'Click to type'})}}
+  if(p){if(!(board[field]||'').trim()&&p.textContent.trim()===fallback)p.textContent='';mk(p,{bdf:field,bdk:k,ph:'Click to type'},'true')}}
  for(const k of ['schedule','timer']){const h=document.querySelector('.bd-panel.bd-'+k+' h2');if(h){const d=PANELS.find(x=>x[0]===k)[1];mk(h,{bdl:k,def:d})}}
  const h1=document.querySelector('.bd-header h1');if(h1)mk(h1,{bdt:'1',ph:'Board title'})}
+document.addEventListener('focusin',ev=>{const t=ev.target;if(t&&t.dataset&&t.dataset.bdk&&BD.edit){BD.focus=t.dataset.bdk;const l=document.querySelector('.bd-rl');if(l)l.textContent='Formatting: '+(lbl(BD.focus)||(PANELS.find(x=>x[0]===BD.focus)||[])[1])}});
+document.addEventListener('paste',ev=>{const t=ev.target;if(t&&t.classList&&t.classList.contains('bd-ed')){ev.preventDefault();const tx=(ev.clipboardData||window.clipboardData).getData('text/plain');document.execCommand('insertText',false,tx)}});
 document.addEventListener('keydown',ev=>{const t=ev.target;if(t&&t.classList&&t.classList.contains('bd-ed')&&(t.tagName==='H1'||t.tagName==='H2')&&ev.key==='Enter'){ev.preventDefault();t.blur()}});
 document.addEventListener('focusout',ev=>{const t=ev.target;if(!t||!t.classList||!t.classList.contains('bd-ed'))return;const v=txt(t).trim();
  if(t.dataset.bdl){bdLabel(t.dataset.bdl,v===t.dataset.def?'':v)}
  else if(t.dataset.bdt){bdTitle(v)}
- else if(t.dataset.bdf){const b=studio().board;if(bs().linked){bs().linked=false;const n=document.querySelector('.bd-tools');if(n&&!n.querySelector('.bd-note'))n.insertAdjacentHTML('beforeend','<span class="bd-note">Planner link switched off so your edits stay.</span>')}b[t.dataset.bdf]=txt(t).replace(/\s+$/,'');save()}});
-const _rEdit=render;render=function(){_rEdit();decorateEdit()};
+ else if(t.dataset.bdf){const b=studio().board;if(bs().linked){bs().linked=false;const n=document.querySelector('.bd-tools');if(n&&!n.querySelector('.bd-note'))n.insertAdjacentHTML('beforeend','<span class="bd-note">Planner link switched off so your edits stay.</span>')}const f=t.dataset.bdf;b[f]=txt(t).replace(/\s+$/,'');const h=clean(t);b.rich??={};if(/<(b|strong|i|em|u|ul|ol|li|span)\b/i.test(h))b.rich[f]=h;else delete b.rich[f];save()}});
+const _rEdit=render;render=function(){_rEdit();decorateBoard()};
 const _bsPage=stPages['Board studio'];
 stPages['Board studio']=()=>classroomForm(_bsPage())+card('Planner link and tools',`<label style="display:block"><input type="checkbox" ${bs().linked?'checked':''} onchange="bs_link(this.checked)"> Board follows today's planner</label>${b('Copy current lesson to board once','bdFromPlanner()')}${b('Open Teaching tools','stGo(\'Teaching tools\')')}`)+card('Board presets',`<p class="muted">A preset sets the layout, panels, timer length and tool in one click. Use the Preset menu on the board.</p>${presets().map(p=>`<div class="row"><b>${e(p.name)}</b><small>${e(p.layout)}${p.tool?' · '+e(TOOLS.find(t=>t[0]===p.tool)?.[1]||''):''} · ${p.minutes} min</small>${b('Apply and open board',`bdPreset('${e(p.id)}');toggleBoard()`)}${p.id.startsWith('b-')?'':b('Delete',`bdPresetDel('${e(p.id)}')`)}</div>`).join('')}${b('Save current board as preset','bdPresetSave()')}`);
 
 const st=document.createElement('style');st.textContent=`
+.bd-board .bd-panel .st-board-text{font-size:calc(clamp(20px,2.1vw,36px)*var(--bsz,1))!important}
+.st-board-text ul,.st-board-text ol{margin:.2em 0;padding-left:1.3em}.st-board-text li{margin:.1em 0}
+.bd-rte{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;background:var(--bp);border:1px solid color-mix(in srgb,var(--bt) 14%,transparent);border-radius:12px;position:sticky;top:6px;z-index:5}.bd-rte .bd-rl{font-size:13px;font-weight:600;margin-right:6px;opacity:.75}.bd-rte button{min-height:32px;padding:4px 10px}.bd-sw i{display:block;width:16px;height:16px;border-radius:50%}.bd-sw{padding:4px 7px!important}
 .bd-ed{outline:2px dashed color-mix(in srgb,var(--ba) 55%,transparent);outline-offset:4px;border-radius:6px;cursor:text;white-space:pre-wrap;min-height:1.2em}.bd-ed:focus{outline:2px solid var(--ba);background:color-mix(in srgb,var(--ba) 8%,transparent)}.bd-ed:empty::before{content:attr(data-ph);opacity:.4}
 .bd-editbtn.on{background:var(--ba)!important;color:var(--bp)!important}.bd-note{align-self:center;font-size:13px;opacity:.7}
 .bd-fld{display:grid;gap:6px;margin:0 0 14px}.bd-lblrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
