@@ -1927,13 +1927,13 @@ const b=(label,call,cls='')=>`<button type="button" class="${cls}" onclick="${ca
 const pool=()=>S.students.filter(s=>s.name&&!(S.excluded||[]).includes(s.id));
 function nm(s,i){const m=bs().names;const parts=String(s.name).trim().split(/\s+/);if(m==='none')return 'Student '+(i+1);if(m==='initials')return parts.map(p=>p[0]).join('').toUpperCase();if(m==='full')return s.name;return parts[0]}
 /* ---------- presets + remembered state ---------- */
-const BUILTIN=[{id:'b-maths',name:'Maths lesson',layout:'Explicit teaching',tool:'',minutes:15,linked:true,hidden:[]},{id:'b-reading',name:'Reading groups',layout:'Independent learning',tool:'groups',minutes:20,linked:true,hidden:[]},{id:'b-indep',name:'Independent work',layout:'Independent learning',tool:'noise',minutes:20,linked:true,hidden:[]},{id:'b-morning',name:'Morning welcome',layout:'Morning welcome',tool:'',minutes:10,linked:false,hidden:[]}];
+const BUILTIN=[{id:'b-maths',name:'Maths lesson',layout:'Explicit teaching',tool:'',minutes:15,linked:true,hidden:[]},{id:'b-reading',name:'Reading groups',layout:'Independent learning',tool:'groups',minutes:20,linked:true,hidden:[]},{id:'b-indep',name:'Independent work',layout:'Independent learning',tool:'noise',minutes:20,linked:true,hidden:[]},{id:'b-finish',name:'Tasks to finish',layout:'Independent learning',tool:'',minutes:20,linked:false,hidden:['next'],title:'Tasks to finish',labels:{intent:'Tasks to finish',criteria:'When you’ve finished',task:'Expectations'}},{id:'b-morning',name:'Morning welcome',layout:'Morning welcome',tool:'',minutes:10,linked:false,hidden:[]}];
 const presets=()=>[...BUILTIN,...(bs().presets||[])];
 let restored=null;
 function restoreState(){if(restored===S)return;restored=S;const st=bs().state;if(!st)return;if(Number.isInteger(st.noise)&&st.noise>=0&&st.noise<4)BD.noise=st.noise;if(Array.isArray(st.labels)&&st.labels.length>=2)BD.chance.labels=st.labels;if(['vowels','first','last','random'].includes(st.hide))BD.word.hide=st.hide}
 function persist(){bs().state={tool:BD.tool,noise:BD.noise,labels:BD.chance.labels,hide:BD.word.hide};save()}
-window.bdPreset=id=>{const p=presets().find(x=>x.id===id);if(!p)return;const b=studio().board;b.layout=p.layout||b.layout;if(p.design&&boardDesigns[p.design])b.design=p.design;b.minutes=p.minutes||b.minutes;bs().linked=!!p.linked;a2().boardHidden=[...(p.hidden||[])];BD.tool=p.tool||'';if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);if(typeof stResetTimer==='function')stResetTimer();persist();render();if(typeof stTimerDraw==='function')stTimerDraw()};
-window.bdPresetSave=()=>{stDialog('Save board preset',stField('Preset name','bdPn',''),()=>{const n=stVal('bdPn').trim();if(!n){alert('Enter a name.');return false}const b=studio().board;(bs().presets??=[]).push({id:uid(),name:n,layout:b.layout,design:b.design,minutes:b.minutes,linked:!!bs().linked,hidden:[...a2().boardHidden],tool:BD.tool});setTimeout(render,0)})};
+window.bdPreset=id=>{const p=presets().find(x=>x.id===id);if(!p)return;const b=studio().board;b.layout=p.layout||b.layout;if(p.design&&boardDesigns[p.design])b.design=p.design;b.minutes=p.minutes||b.minutes;bs().linked=!!p.linked;a2().boardHidden=[...(p.hidden||[])];bs().labels={...(p.labels||{})};bs().title=p.title||'';BD.tool=p.tool||'';if(BD.tool==='angle'&&BD.angle.deg===null)angleNew(true);if(BD.tool==='word')wordNew(true);if(typeof stResetTimer==='function')stResetTimer();persist();render();if(typeof stTimerDraw==='function')stTimerDraw()};
+window.bdPresetSave=()=>{stDialog('Save board preset',stField('Preset name','bdPn',''),()=>{const n=stVal('bdPn').trim();if(!n){alert('Enter a name.');return false}const b=studio().board;(bs().presets??=[]).push({id:uid(),name:n,layout:b.layout,design:b.design,minutes:b.minutes,linked:!!bs().linked,hidden:[...a2().boardHidden],labels:{...(bs().labels||{})},title:bs().title||'',tool:BD.tool});setTimeout(render,0)})};
 window.bdPresetDel=id=>{bs().presets=(bs().presets||[]).filter(x=>x.id!==id);save();render()};
 const nmById=id=>{const i=S.students.findIndex(s=>s.id===id);return i<0?'':nm(S.students[i],i)};
 
@@ -1945,11 +1945,24 @@ function lessonNow(){const d=new Date(),ds=dateISO(d),hh=String(d.getHours()).pa
  return{cur:cur||next,next:cur?next:rows.find(r=>r.start>(next?next.start:hh))||null,ds}}
 window.bdFromPlanner=()=>{const{cur,next}=lessonNow();if(!cur){alert('No lesson found for today in the planner.');return}
  const bd=studio().board;Object.assign(bd,{intention:cur.li||'',criteria:cur.sc||'',task:cur.independent||cur.focus||'',next:next?(next.name||next.subject):''});save();render()};
+
+/* ---------- editable panel headings, board title ---------- */
+const PANELS=[['intent','Learning intention','Ready to learn','intention'],['criteria','Success criteria','Listen, participate and do your best.','criteria'],['task','Independent task','Follow your teacher’s instructions.','task'],['next','Coming up next','Check today’s timetable.','next'],['schedule','Today’s timetable'],['timer','Classroom timer']];
+const lbl=k=>((bs().labels||{})[k]||'').trim();
+function relabel(html){const b0=studio().board;
+ for(const [k,def,fallback,field] of PANELS){const L=lbl(k);if(!L)continue;
+  html=html.replace(new RegExp('(<section class="bd-panel bd-'+k+'"><h2>)[^<]*(</h2>)'),(m,a,z)=>a+e(L)+z);
+  if(fallback&&!(b0[field]||'').trim())html=html.replace(new RegExp('(<section class="bd-panel bd-'+k+'">.*?)<p class="st-board-text">[^<]*</p>'),'$1<p class="st-board-text"></p>')}
+ const T=(bs().title||'').trim();if(T)html=html.replace(/(<header class="bd-header"><div><div class="bd-kicker">[^<]*<\/div><h1>)[^<]*(<\/h1>)/,(m,a,z)=>a+e(T)+z);
+ return html}
+window.bdLabel=(k,v)=>{const l=bs().labels??={};if(String(v).trim())l[k]=String(v).trim();else delete l[k];save()};
+window.bdTitle=v=>{bs().title=String(v).trim();save()};
+window.bdShow=(k,on)=>{const a=a2();a.boardHidden=on?a.boardHidden.filter(x=>x!==k):[...new Set([...a.boardHidden,k])];save()};
 const _stBoard=stBoard;
 stBoard=function(){const root=ext().studio12,orig=root.board;
  if(bs().linked){const{cur,next}=lessonNow();root.board={...orig,intention:cur?.li||orig.intention,criteria:cur?.sc||orig.criteria,task:cur?(cur.independent||cur.focus||orig.task):orig.task,next:next?(next.name||next.subject):orig.next}}
  let html;try{html=_stBoard()}finally{root.board=orig}
- restoreState();const tools=`<nav class="bd-tools" aria-label="Board tools"><select aria-label="Board preset" onchange="bdPreset(this.value);this.value=''"><option value="">Preset…</option>${presets().map(p=>`<option value="${e(p.id)}">${e(p.name)}</option>`).join('')}</select>${TOOLS.map(([k,l])=>`<button type="button" class="${BD.tool===k?'on':''}" onclick="bdTool('${k}')">${e(l)}</button>`).join('')}</nav>`;
+ html=relabel(html);restoreState();const tools=`<nav class="bd-tools" aria-label="Board tools"><select aria-label="Board preset" onchange="bdPreset(this.value);this.value=''"><option value="">Preset…</option>${presets().map(p=>`<option value="${e(p.id)}">${e(p.name)}</option>`).join('')}</select>${TOOLS.map(([k,l])=>`<button type="button" class="${BD.tool===k?'on':''}" onclick="bdTool('${k}')">${e(l)}</button>`).join('')}</nav>`;
  html=html.replace('<div class="bd-grid">',tools+'<div class="bd-grid">');
  if(BD.tool)html=html.replace(/<\/div>$/,`<div class="bd-overlay" role="dialog" aria-label="${e(TOOLS.find(t=>t[0]===BD.tool)[1])}"><div class="bd-ohead"><h2>${e(TOOLS.find(t=>t[0]===BD.tool)[1])}</h2>${b('Close','bdTool(\'\')')}</div><div class="bd-obody">${toolHTML(BD.tool)}</div></div></div>`);
  return html};
@@ -2023,10 +2036,21 @@ const _r=render;render=function(){_r();
  for(const x of document.querySelectorAll('#nav .v11-menu button'))if(x.textContent==='Teaching tools')x.onclick=()=>stGo('Teaching tools')};
 
 /* ---------- board studio additions ---------- */
+
+function hdRow(k,def,control){const shown=!a2().boardHidden.includes(k);return `<div class="bd-fld"><div class="bd-lblrow"><input class="bd-lbl" value="${e(lbl(k)||def)}" aria-label="Heading for ${e(def)}" onchange="bdLabel('${k}',this.value===${JSON.stringify(def).replace(/"/g,'&quot;')}?'':this.value)"><label class="bd-show"><input type="checkbox" ${shown?'checked':''} onchange="bdShow('${k}',this.checked)"> Show on board</label></div>${control}</div>`}
+function classroomForm(html){
+ const ta=(id,k,def)=>html=html.replace(new RegExp('<label class="field">'+def+'(<textarea id="'+id+'"[^>]*>[\\s\\S]*?</textarea>)</label>'),(m,c)=>hdRow(k,def,c.replace('<textarea ','<textarea aria-label="'+def+' text" ')));
+ ta('stIntent','intent','Learning intention');ta('stCriteria','criteria','Success criteria');ta('stTask','task','Independent task');
+ html=html.replace(/<label class="field">Coming up next(<input id="stNext"[^>]*>)<\/label>/,(m,c)=>hdRow('next','Coming up next',c.replace('<input ','<input aria-label="Coming up next text" ')));
+ const extra=`<div class="bd-fld bd-extra"><label class="field">Board title <small class="muted">(leave blank for the greeting)</small><input id="bdTitle" value="${e(bs().title||'')}" placeholder="e.g. Tasks to finish" onchange="bdTitle(this.value)"></label><div class="bd-lblrow"><span class="muted">Also on the board:</span>${[['schedule','Today’s timetable'],['timer','Timer']].map(([k,n])=>`<label class="bd-show"><input type="checkbox" ${a2().boardHidden.includes(k)?'':'checked'} onchange="bdShow('${k}',this.checked)"> ${n}</label>`).join('')}</div><p class="muted">Edit any heading above to rename it, and untick Show on board to hide a panel. Save the result as a preset to reuse it.</p></div>`;
+ return html.replace(/(<h[23]>Classroom display<\/h[23]>)/,'$1'+extra)}
 const _bsPage=stPages['Board studio'];
-stPages['Board studio']=()=>_bsPage()+card('Planner link and tools',`<label style="display:block"><input type="checkbox" ${bs().linked?'checked':''} onchange="bs_link(this.checked)"> Board follows today's planner</label>${b('Copy current lesson to board once','bdFromPlanner()')}${b('Open Teaching tools','stGo(\'Teaching tools\')')}`)+card('Board presets',`<p class="muted">A preset sets the layout, panels, timer length and tool in one click. Use the Preset menu on the board.</p>${presets().map(p=>`<div class="row"><b>${e(p.name)}</b><small>${e(p.layout)}${p.tool?' · '+e(TOOLS.find(t=>t[0]===p.tool)?.[1]||''):''} · ${p.minutes} min</small>${b('Apply and open board',`bdPreset('${e(p.id)}');toggleBoard()`)}${p.id.startsWith('b-')?'':b('Delete',`bdPresetDel('${e(p.id)}')`)}</div>`).join('')}${b('Save current board as preset','bdPresetSave()')}`);
+stPages['Board studio']=()=>classroomForm(_bsPage())+card('Planner link and tools',`<label style="display:block"><input type="checkbox" ${bs().linked?'checked':''} onchange="bs_link(this.checked)"> Board follows today's planner</label>${b('Copy current lesson to board once','bdFromPlanner()')}${b('Open Teaching tools','stGo(\'Teaching tools\')')}`)+card('Board presets',`<p class="muted">A preset sets the layout, panels, timer length and tool in one click. Use the Preset menu on the board.</p>${presets().map(p=>`<div class="row"><b>${e(p.name)}</b><small>${e(p.layout)}${p.tool?' · '+e(TOOLS.find(t=>t[0]===p.tool)?.[1]||''):''} · ${p.minutes} min</small>${b('Apply and open board',`bdPreset('${e(p.id)}');toggleBoard()`)}${p.id.startsWith('b-')?'':b('Delete',`bdPresetDel('${e(p.id)}')`)}</div>`).join('')}${b('Save current board as preset','bdPresetSave()')}`);
 
 const st=document.createElement('style');st.textContent=`
+.bd-fld{display:grid;gap:6px;margin:0 0 14px}.bd-lblrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
+.bd-lbl{font-weight:700;font-size:15px;max-width:340px;flex:1 1 220px;padding:6px 10px;background:transparent;border:1px dashed var(--line);border-radius:8px}.bd-lbl:hover,.bd-lbl:focus{background:var(--panel);border-style:solid}
+.bd-show{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap}.bd-extra{padding:10px 0 4px;border-bottom:1px solid var(--line);margin-bottom:16px}
 .bd-tools{display:flex;flex-wrap:wrap;gap:8px}
 .bd-board .bd-tools button.on,.bd-board .bd-row button.on{background:var(--ba);color:var(--bp)}
 .bd-board{position:relative}
