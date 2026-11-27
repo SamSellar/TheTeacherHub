@@ -2127,7 +2127,9 @@ const st=document.createElement('style');st.textContent=`
 (function(){
 'use strict';
 const STATUS=['Not started','Draft','In review','Complete'];
-const SEED={attitude:['approaches learning positively','participates actively in class','benefits from encouragement to engage'],habits:['works independently','uses feedback to improve work','is developing independence'],progress:['has made steady progress','has made strong progress','is building confidence']};
+const SEED={attitude:['approaches learning positively','participates actively in class','benefits from encouragement to engage','shows genuine enthusiasm for new learning','is eager to take on a challenge','brings a positive attitude to the classroom each day','is curious and asks thoughtful questions','shows a willingness to have a go','is growing in confidence when sharing ideas','takes pride in the work produced','is motivated to improve','is developing a more positive approach to challenging tasks','settles quickly and is ready to learn','contributes thoughtful ideas to class discussions'],
+habits:['works independently','uses feedback to improve work','is developing independence','manages time well during set tasks','completes tasks to a high standard','organises materials and belongings well','stays focused during independent work','is learning to check work before handing it in','follows classroom routines consistently','persists when work becomes challenging','works cooperatively with others','is developing stamina for longer tasks','takes responsibility for learning','seeks help when needed'],
+progress:['has made steady progress','has made strong progress','is building confidence','has made pleasing gains this semester','has grown in skills and understanding','is making consistent progress towards the expected level','has shown great improvement in recent weeks','has progressed well with support','is applying new skills with growing success','has met the expected standard in most areas','has exceeded expectations in several areas','is working towards the expected standard with increasing confidence','has made encouraging progress in areas of focus','continues to build on previous learning']};
 const el=id=>document.getElementById(id);
 const bank=()=>{const a=ext();a.commentBank??={attitude:[...SEED.attitude],habits:[...SEED.habits],progress:[...SEED.progress]};return a.commentBank};
 const limit=()=>studio().commentLimit||1200;
@@ -2154,10 +2156,11 @@ stPages['Comment builder']=()=>{rSem=reportSem||rSem;const s=S.students.find(x=>
   ${stArea('Report comment','stComment',r.comment)}<div class="row"><span id="stChar" class="rp-count">${String(r.comment||'').length} / ${limit()}</span>${stField('Character limit','stLimit',limit(),'number')}</div>
   ${stSelect('Status','stStatus',STATUS,r.status||'Draft')}<div class="row">${stBtn('Save','stSaveComment()',true)}${stBtn('Save & next student','rpStep(1,true)')}${stBtn('Copy comment','rpCopy()')}</div>`)}</div>
   <div>${card('Evidence for '+e(first(s)),`<p class="muted">Click “Use” to add a line to the strengths box. Nothing is added automatically.</p>${evidenceFor(s.id).map((x,i)=>`<div class="rp-ev"><b>${e(x.k)}</b> ${e(x.t)} <button type="button" onclick="rpUse(${i})">Use</button></div>`).join('')||empty('No evidence recorded yet. Add achievements and observations in the student profile, or use the Evidence collector.')}`)}
-  ${card('My phrase bank',`<p class="muted">Edit one phrase per line. These only appear in the three lists.</p>${[['attitude','Learning attitude'],['habits','Work habits'],['progress','Progress']].map(([k,l])=>`<label class="field">${l}<textarea id="rpb_${k}" rows="3">${e(bk[k].join('\n'))}</textarea></label>`).join('')}${stBtn('Save phrases','rpSaveBank()')}`)}</div></div>`:empty('Choose a student.'))};
+  ${card('My phrase bank',`<p class="muted">Edit one phrase per line. These only appear in the three lists. Write each so it follows the student’s name, such as “works independently”.</p>${[['attitude','Learning attitude'],['habits','Work habits'],['progress','Progress']].map(([k,l])=>`<label class="field">${l}<textarea id="rpb_${k}" rows="8">${e(bk[k].join('\n'))}</textarea></label>`).join('')}${stBtn('Save phrases','rpSaveBank()')} ${stBtn('Add suggested phrases','rpMorePhrases()')}`)}</div></div>`:empty('Choose a student.'))};
 window.rpUse=i=>{const s=S.students.find(x=>x.id===rStu);if(!s)return;const t=evidenceFor(s.id)[i]?.t;if(!t)return;const a=el('stStrength');a.value=(a.value.trim()?a.value.trim()+'\n':'')+t;a.focus()};
 window.rpBuild=()=>{const s=S.students.find(x=>x.id===rStu);if(!s)return;const n=first(s);const parts=['attitude','habits','progress'].map(k=>el('rp_'+k).value).filter(Boolean).map(v=>n+' '+v+'.');
  for(const k of ['stStrength','stNext']){const v=stVal(k).trim();if(v)parts.push(v.replace(/\n+/g,' ').replace(/[.!?]?$/,'.'))}el('stComment').value=parts.join(' ');stCountComment()};
+window.rpMorePhrases=()=>{const b=bank();for(const k of ['attitude','habits','progress']){const cur=el('rpb_'+k).value.split('\n').map(x=>x.trim()).filter(Boolean);for(const x of SEED[k])if(!cur.includes(x))cur.push(x);b[k]=cur}save();render()};
 window.rpSaveBank=()=>{const b=bank();for(const k of ['attitude','habits','progress'])b[k]=el('rpb_'+k).value.split('\n').map(x=>x.trim()).filter(Boolean);save();render()};
 window.rpCopy=()=>{const t=stVal('stComment');(navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>window.toast&&window.toast('Copied')).catch(()=>{const a=el('stComment');a.select();document.execCommand('copy')})};
 window.rpStep=(d,save1)=>{if(save1&&stVal('stComment')!==undefined)stSaveComment();const i=S.students.findIndex(x=>x.id===rStu),n=S.students[i+d];if(n){stStudent=n.id;render()}};
@@ -2476,6 +2479,31 @@ add(F.home,['A helpful way to support {N} at home is {hm}.']);add(F.home2,['It w
 add(F.nx,['A goal for {N} is to {nx}.','{N} will continue to work towards being able to {nx}.']);
 })();
 
+/* possessive phrasings (used only when the teacher chooses Name, he/him/his or Name, she/her/hers) */
+(function(){const W=BANK.warm,F=BANK.formal,add=(a,l)=>{for(const x of l)if(!a.includes(x))a.push(x)};
+add(W.L[4].plain,['{P} work in {A} is well above the expected level for this stage.','{P} understanding of {A} is a real strength, and {s} is achieving above the expected standard.','{P} results in {A} are well above what is expected.']);
+add(W.L[4].skill,['{P} work in {A} is well above the expected level, and {s} {st}.','{P} understanding of {A} is a real strength. {S} {st}.']);
+add(W.L[3].plain,['{P} work in {A} is at the expected level.','{P} progress in {A} has been solid, and {s} is meeting the expected standard.','{P} understanding of {A} is secure.']);
+add(W.L[3].skill,['{P} work in {A} is at the expected level, and {s} {st}.','{P} progress in {A} has been solid. {S} {st}.']);
+add(W.L[2].plain,['{P} work in {A} is developing, and {s} is working towards the expected standard.','{P} skills in {A} are growing steadily.']);
+add(W.L[2].skill,['{P} skills in {A} are developing, and {s} {st}.','{P} work in {A} is progressing. {S} {st}.']);
+add(W.L[1].plain,['{A} is an area of challenge for {N}, and support is in place to build {p} confidence.','{P} confidence in {A} is growing with support.','Support is in place to help build {p} skills in {A}.']);
+add(W.L[1].skill,['{P} skills in {A} are being built with support, and {s} {st}.']);
+add(W.mean[4],['This reflects the effort {s} puts into {p} learning.']);add(W.mean[3],['{P} effort is clearly paying off.']);add(W.mean[2],['{P} effort is helping these skills to grow.']);add(W.mean[1],['{P} perseverance is making a difference.']);
+add(W.nx,['{P} next step is to {nx}.','In {A}, {p} next step is to {nx}.','{P} goal is to {nx}.']);
+add(W.home,['At home, {p} learning would benefit from {hm}.','You can support {p} learning at home by {hm}.']);
+add(W.impact,['{P} approach to learning has been a strength this {T}.']);
+add(W.proud.hi,['I am proud of {p} efforts this {T}.']);add(W.proud.mid,['I appreciate {p} effort this {T}.']);add(W.proud.lo,['I admire {p} persistence this {T}.']);
+add(W.partner,['Thank you for supporting {p} learning at home.']);
+add(W.open[5],['{N} has had a wonderful {T}, and {s} should be proud of {p} achievements.']);add(W.open[4],['{N} has had a very successful {T}, and {p} progress is pleasing.']);add(W.open[3],['{N} has made good progress this {T}, and {p} effort is appreciated.']);add(W.open[2],['{N} has worked steadily this {T}, and {p} progress is encouraging.']);
+add(W.close.s1hi,['Well done, {N}. I am proud of {p} efforts so far this year.']);add(W.close.s2hi,['Well done, {N}. I am proud of {p} efforts this year.']);
+add(F.L[4].plain,['{P} achievement in {A} is above the expected standard.']);add(F.L[4].skill,['{P} achievement in {A} is above the expected standard, and {s} {st}.']);
+add(F.L[3].plain,['{P} achievement in {A} is at the expected standard.']);add(F.L[3].skill,['{P} achievement in {A} is at the expected standard, and {s} {st}.']);
+add(F.L[2].plain,['{P} achievement in {A} is progressing towards the expected standard.']);add(F.L[2].skill,['{P} achievement in {A} is progressing towards the expected standard, and {s} {st}.']);
+add(F.L[1].plain,['{P} progress in {A} requires continued support.']);add(F.L[1].skill,['{P} progress in {A} requires continued support, and {s} {st}.']);
+add(F.nx,['{P} next step is to {nx}.']);add(F.home,['At home, {p} learning would benefit from {hm}.']);
+})();
+
 /* ---------- helpers ---------- */
 const IRR={have:'has',do:'does',go:'goes'};
 const V2=new Set(['analyse','name','write','organise','subtract','divide','order','represent','measure','test','create','proofread','draft','respond','conduct','compare','record','perform','interpret','plan','edit','separate','make','read','recognise','describe','use','explain','summarise','improve','retell']);
@@ -2508,8 +2536,8 @@ function build(id,sem,o={}){
  const P={s:pr==='he'?'he':pr==='she'?'she':N,p:pr==='he'?'his':pr==='she'?'her':''};
  const ctx={used:new Set(),prev:'',tone,pron:pr,fit,sem,id,t};
  const T=sem==='2'?'year':'semester';
- const fill=(f,o)=>f.replace(/\{N\}/g,N).replace(/\{s\}/g,P.s).replace(/\{S\}/g,capFirst(P.s)).replace(/\{p\}/g,P.p).replace(/\{T\}/g,T).replace(/\{A\}/g,o.A||'').replace(/\{st\}/g,o.st||'').replace(/\{nx\}/g,o.nx||'').replace(/\{ex\}/g,o.ex||'').replace(/\{pl\}/g,o.pl||'').replace(/\{dl\}/g,o.dl||'').replace(/\{hm\}/g,o.hm||'');
- const usable=bank=>{const u=bank.filter(f=>(P.p||!f.includes('{p}'))&&!(ctx.multi&&/\{A\} (is|are)\b/.test(f)));const fresh=u.filter(f=>!ctx.used.has(f));return fresh.length?fresh:u};
+ const fill=(f,o)=>f.replace(/\{N\}/g,N).replace(/\{s\}/g,P.s).replace(/\{S\}/g,capFirst(P.s)).replace(/\{p\}/g,P.p).replace(/\{P\}/g,capFirst(P.p)).replace(/\{T\}/g,T).replace(/\{A\}/g,o.A||'').replace(/\{st\}/g,o.st||'').replace(/\{nx\}/g,o.nx||'').replace(/\{ex\}/g,o.ex||'').replace(/\{pl\}/g,o.pl||'').replace(/\{dl\}/g,o.dl||'').replace(/\{hm\}/g,o.hm||'');
+ const usable=bank=>{const u=bank.filter(f=>(P.p||!/\{[pP]\}/.test(f))&&!(ctx.multi&&/\{A\} (is|are)\b/.test(f)));const fresh=u.filter(f=>!ctx.used.has(f));return fresh.length?fresh:u};
  const out=[];
  if(!(t.overall||Object.keys(t.qual).length||ARE().some(a=>(t.areas[a.id]||{}).lvl)||String(t.extra||'').trim()))return{sentences:[],text:''};
  function sentence(key,kind,sigData,gen,g){
@@ -2609,7 +2637,7 @@ function inner(){const{sem,id}=ctxIds();const t=tick(id,sem),pr=prons()[id]||'';
  const prev=res.sentences.length?res.sentences.map(s=>`<span class="tb-s" title="${esc(s.kind)}">${esc(s.text)}${s.key==='extra'?'':` <button type="button" class="tb-re" aria-label="Reword this sentence" title="Reword this sentence" onclick="tbSwap('${esc(s.key)}')">↻</button>`}</span>`).join(' '):'<p class="muted">Tick an overall impression, some qualities or a subject level and the comment appears here.</p>';
  return `<div class="tb-grid"><div class="tb-left">
   <h3>1 · Overall</h3><div class="tb-row"><span class="tb-lab">This ${rpCtx().sem==='2'?'year':'semester'} was</span>${seg('Overall impression',[[5,'Outstanding'],[4,'Very positive'],[3,'Positive'],[2,'Steady'],[1,'Challenging']],t.overall,'tbOv')}</div>
-  <div class="tb-row"><span class="tb-lab">Refer to ${esc(first())} as</span>${seg('Pronoun',[['he','Name and he'],['she','Name and she'],['','Name only']],pr,'tbPr')}</div>
+  <div class="tb-row"><span class="tb-lab">Refer to ${esc(first())} as</span>${seg('Pronoun',[['he','Name, he/him/his'],['she','Name, she/her/hers'],['','Name only']],pr,'tbPr')}</div>
   <div class="tb-row"><span class="tb-lab">Year level</span>${seg('Year level',YEARS.map(y=>[y,y==='F'?'Foundation':'Year '+y]),yr(),'tbYear')}</div>
   <div class="tb-row"><span class="tb-lab">Tone</span>${seg('Tone',[['warm','Warm'],['formal','Formal']],t.tone,'tbTone')}</div>
   <div class="tb-row"><span class="tb-lab">Length</span>${seg('Length',[['auto','Aim for 900–1200'],['ticked','Just what I ticked']],t.len==='ticked'?'ticked':'auto','tbLen')}</div>
@@ -2831,7 +2859,7 @@ const css=document.createElement('style');css.textContent=`.rs-sheet{background:
    Cloud rules, auth and the owner-only model are untouched: this module only reads and writes S in memory and the usual save() path. */
 (function(){
 'use strict';
-const APP_VERSION='3.1.0',SCHEMA=3;
+const APP_VERSION='3.1.2',SCHEMA=3;
 window.HUB_VERSION=APP_VERSION;window.HUB_SCHEMA=SCHEMA;
 const el=id=>document.getElementById(id);
 
