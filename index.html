@@ -2402,7 +2402,7 @@ const BANK={
          s1lo:['I look forward to continuing to support {N} in Semester 2.','We will keep working together to build {N}’s confidence in Semester 2.'],
          s2hi:['Congratulations on a wonderful year, {N}. I wish you all the best for the year ahead.','Thank you for all your efforts this year, {N}. I look forward to seeing you continue to flourish.','I wish {N} all the best for the year ahead.'],
          s2mid:['Thank you for your efforts this year, {N}. I wish you all the best for the year ahead.','I wish {N} all the best for the year ahead.'],
-         s2lo:['I wish {N} all the best for the year ahead and know continued support will help {s} grow.','Thank you for your efforts this year, {N}. I wish you all the best for the year ahead.']}
+         s2lo:['I wish {N} all the best for the year ahead and know continued support will help {N} grow.','Thank you for your efforts this year, {N}. I wish you all the best for the year ahead.']}
  },
  formal:{
   open:{5:['{N} has achieved outstanding results this {T}.','{N} has demonstrated exceptional achievement this {T}.'],4:['{N} has demonstrated very positive achievement this {T}.','{N} has had a very successful {T}.'],3:['{N} has demonstrated positive progress this {T}.','{N} has made good progress this {T}.'],2:['{N} has demonstrated steady progress this {T}.','{N} has progressed steadily this {T}.'],1:['{N} has experienced some challenges this {T}.','{N} has required additional support this {T}.']},
@@ -2422,6 +2422,59 @@ const BANK={
          s2hi:['I wish {N} every success for the year ahead.'],s2mid:['I wish {N} all the best for the year ahead.'],s2lo:['Continued support will assist {N} in the year ahead.']}
  }
 };
+
+/* ---------- extra variety: more phrasings in every pool so comments across a class do not read alike ---------- */
+(function(){const W=BANK.warm,F=BANK.formal,add=(a,l)=>{for(const x of l)if(!a.includes(x))a.push(x)};
+add(W.open[5],['It has been a joy to teach {N} this {T}, and the results speak for themselves.','{N} has produced work of an exceptional standard this {T}.','This {T} has been a standout one for {N}.','{N} has soared this {T}, and I could not be prouder.']);
+add(W.open[4],['{N} has made excellent progress this {T}.','I have been so impressed with {N}’s growth this {T}.','This {T} has been a strong one for {N}.','{N} has approached this {T} with real success.']);
+add(W.open[4],['{N} has had a really strong {T} and should feel proud.','What a pleasing {T} {N} has had.','{N} has gone from strength to strength this {T}.','It has been great to see {N} thrive this {T}.']);
+add(W.open[3],['{N} has had a good {T} and has taken on new learning well.','{N} has grown in confidence this {T}.','{N} has made a good start to building on previous learning this {T}.','{N} has had a solid {T} and has grown in many ways.','{N} has worked steadily through this {T} and made pleasing progress.','It has been lovely to see {N} progress this {T}.','{N} has made pleasing progress this {T}.']);
+add(W.open[2],['{N} has continued to grow as a learner this {T}.','This {T}, {N} has been steadily building skills and confidence.','{N} has put in steady work this {T} and is moving forward.','{N} has made gradual but genuine progress this {T}.']);
+add(W.open[1],['{N} has shown real determination this {T} in the face of some challenges.','This {T} has been a time of building foundations for {N}.','We have worked closely with {N} this {T} to build confidence and skills.']);
+add(W.L[4].plain,['{A} has been a highlight for {N}, who is working well above the expected standard.','{N} is excelling in {A}, consistently exceeding what is expected.','{N} has a strong grasp of {A} and is achieving above the expected level.']);
+add(W.L[4].skill,['{N} is excelling in {A}, where {s} {st}.','{A} is a highlight for {N}, who is achieving above the expected level and {st}.','{N} has a strong grasp of {A}. {S} {st}.','Working above the expected level in {A}, {N} {st}.']);
+add(W.L[3].plain,['{N} has a secure understanding of {A} and is achieving at the expected level.','{N} is progressing well in {A} and is meeting expectations.','Expectations are being met by {N} in {A}.']);
+add(W.L[3].skill,['Working at the expected level in {A}, {N} {st}.','{N} is progressing well in {A}, where {s} {st}.','{N} has a secure grasp of {A}. {S} {st}.','In {A}, {N} is meeting expectations and {st}.']);
+add(W.L[2].plain,['{N} is progressing towards the expected level in {A} and continues to grow.','{A} is developing well for {N}, who is working towards the expected standard.','{N} is on the way to the expected level in {A}.']);
+add(W.L[2].skill,['Working towards the expected level in {A}, {N} {st}.','{N} is gaining ground in {A} and {st}.','In {A}, {N} is progressing and {st}.','{N} is developing in {A}, where {s} {st}.']);
+add(W.L[1].plain,['{N} is building the foundations of {A} with extra support.','Extra support is helping {N} build confidence in {A}.','{A} is an area where {N} is receiving targeted support.']);
+add(W.L[1].skill,['With support in {A}, {N} {st}.','{N} is building foundations in {A}, where {s} {st}.','In {A}, {N} is working hard with support and {st}.']);
+add(W.ex,['This stood out {ex}.','This became apparent {ex}.','This really showed {ex}.','{S} demonstrated this {ex}.']);
+add(W.mean[4],['{S} brings real insight to this learning.','This shows {N}’s ability to apply what has been learned.']);
+add(W.mean[3],['This is a pleasing result for {N}.','{S} is applying what has been taught well.']);
+add(W.mean[2],['Practice is helping these skills to grow.','{N} is making encouraging gains.']);
+add(W.mean[1],['Every step forward is worth celebrating.']);
+add(W.home,['A great way to help at home is {hm}.','Families can make a real difference by {hm}.','At home, {hm} would be a wonderful help for {N}.']);
+add(W.home2,['Something else that would help is {hm}.','You might also consider {hm}.']);
+add(W.impact,['Qualities like these are a strong foundation for {N}’s future learning.','These strengths have helped {N} get the most out of this {T}.']);
+add(W.proud.hi,['{N} has every reason to feel proud of this {T}.','I am delighted with what {N} has achieved this {T}.']);
+add(W.proud.mid,['{N} should feel pleased with the progress made this {T}.','I am happy with the progress {N} has made this {T}.']);
+add(W.proud.lo,['I admire the persistence {N} has shown this {T}.','{N} has tried hard this {T}, and I appreciate the effort.']);
+add(W.partner,['Thank you for partnering with us to support {N}.','Your support at home is greatly appreciated.','Thank you for the encouragement you give {N} at home.']);
+add(W.nx,['One goal for {N} is to {nx}.','We will be encouraging {N} to {nx}.','Looking ahead, {N} will aim to {nx}.','Our focus for {N} now is to {nx}.','{N} will continue to build skills by learning to {nx}.']);
+add(W.qc,['Always a pleasure to have in class, {N} {pl}.','{N} is a student who {pl}.','In class, {N} {pl}.','{N} {pl}, setting a wonderful example for others.']);
+add(W.qc2,['On top of this, {s} {pl}.','Beyond this, {s} {pl}.','Pleasingly, {s} {pl}.','{S} {pl}, too.']);
+add(W.qu,['Generally, {N} {pl}.','In class, {N} {pl}.']);
+add(W.qu2,['On top of this, {s} {pl}.','{S} {pl} as well.']);
+add(W.qd,['There is room for {N} to grow in {dl}.','{N} will benefit from further developing {dl}.','Developing {dl} is a goal for {N}.','Continued growth in {dl} will help {N}.']);
+add(W.qda,['Another goal for {N} is {dl}.','Looking ahead, {N} will also benefit from developing {dl}.','In addition, {N} will keep working on {dl}.']);
+add(W.close.s1hi,['I am looking forward to seeing {N} continue to shine in Semester 2.','Keep up the great work, {N}.','What a strong first semester, {N}.']);
+add(W.close.s1mid,['I look forward to seeing {N} build on this in Semester 2.','Well done on your efforts so far, {N}.']);
+add(W.close.s1lo,['We will keep encouraging {N} every step of the way in Semester 2.','I am confident {N} will keep growing in Semester 2.']);
+add(W.close.s2hi,['It has been a privilege to teach you this year, {N}.','Well done on a fantastic year, {N}. I wish you every success next year.']);
+add(W.close.s2mid,['Well done on this year’s effort, {N}. All the best for next year.','It has been a pleasure to teach you this year, {N}.']);
+add(W.close.s2lo,['I am proud of how hard {N} has tried this year and wish {N} every success next year.']);
+/* formal tone */
+add(F.open[5],['{N} has performed at an outstanding standard this {T}.']);add(F.open[4],['{N} has achieved very good results this {T}.']);add(F.open[3],['{N} has achieved satisfactory progress this {T}.','{N} has progressed well this {T}.']);add(F.open[2],['{N} has made steady gains this {T}.']);add(F.open[1],['{N} has faced some challenges this {T}.']);
+add(F.L[4].plain,['{N} is exceeding the expected standard in {A}.']);add(F.L[4].skill,['{N} is exceeding the expected standard in {A} and {st}.','In {A}, {N} is achieving well above the expected level and {st}.']);
+add(F.L[3].plain,['{N} is meeting the expected standard in {A}.']);add(F.L[3].skill,['{N} is meeting the expected standard in {A} and {st}.','In {A}, {N} is achieving at the expected level and {st}.']);
+add(F.L[2].plain,['{N} is developing towards the expected standard in {A}.']);add(F.L[2].skill,['{N} is developing towards the expected standard in {A} and {st}.']);
+add(F.L[1].plain,['{N} continues to require support in {A}.']);add(F.L[1].skill,['In {A}, {N} requires support and {st}.']);
+add(F.ex,['This was evident {ex}.','This was apparent {ex}.']);
+add(F.mean[3],['This reflects secure learning of the content taught.']);add(F.mean[4],['This reflects a strong grasp of the concepts taught.']);
+add(F.home,['A helpful way to support {N} at home is {hm}.']);add(F.home2,['It would also be beneficial to continue {hm}.']);
+add(F.nx,['A goal for {N} is to {nx}.','{N} will continue to work towards being able to {nx}.']);
+})();
 
 /* ---------- helpers ---------- */
 const IRR={have:'has',do:'does',go:'goes'};
@@ -2595,7 +2648,18 @@ window.tbUse=()=>{const{id,sem}=ctxIds();const r=final(id,sem);const a=el('stCom
 
 /* ---------- hook into the Comment builder page ---------- */
 const _cb=stPages['Comment builder'];
-stPages['Comment builder']=()=>{const h=_cb();const c=rpCtx();if(!c.id||h.indexOf('<div class="rp-grid">')<0)return h;return h.replace('<div class="rp-grid">',html()+'<div class="rp-grid">')};
+/* ---------- grade results: pick profile grades and apply them as subject levels (the teacher stays in control) ---------- */
+const GMAP=[['reading','read'],['writing','write'],['spelling','spell'],['speaking','speak'],['number','num,addsub,muldiv,frac'],['algebra','alg'],['measurement','meas'],['space','geo'],['statistics','stat'],['probability','stat'],['maths','num,addsub,muldiv,frac,meas,geo,stat,reason,alg'],['hass','hass'],['science','sci'],['arts','arts'],['technolog','tech'],['health','hpe']];
+const gIds=a=>{const k=String(a).toLowerCase();const m=GMAP.find(x=>k.includes(x[0]));return m?m[1].split(','):[]};
+function gLevel(l){const b=l.band,g=l.grade;if(b==='Above')return 4;if(b==='At')return 3;if(b==='Below')return 2;return ({A:4,B:3,C:3,D:2,E:1})[g]||0}
+function gradeRows(id){const lv=(a2profile(id)||{}).levels||{};return Object.keys(lv).map(a=>{const l=lv[a]||{};return{area:a,grade:l.grade||'',band:l.band||'',lvl:gLevel(l),ids:gIds(a)}}).filter(r=>r.lvl)}
+function gradeCard(id){const rows=gradeRows(id);const body=rows.length?`<p class="muted">Tick the grades to carry into the builder. Each sets that subject’s level only; you still choose strengths and next steps.</p>${rows.map((r,i)=>`<label class="tb-ck"><input type="checkbox" class="tbg" value="${i}" ${r.ids.length?'checked':'disabled'}> <span><b>${esc(r.area)}</b> ${esc([r.grade,r.band].filter(Boolean).join(' · '))} → ${LV[r.lvl]}${r.ids.length?'':' (not in the builder)'}</span></label>`).join('')}<div class="row"><button type="button" onclick="tbGrades()">Apply selected grades</button><span id="tbGradeMsg" class="muted"></span></div>`:`<p class="muted">No grades or bands recorded for this student yet. Add them in the student profile and they will appear here.</p>`;
+ return `<section class="card" id="tbGrades"><h2>Select grade results</h2>${body}</section>`}
+window.tbGrades=()=>{const{sem,id}=ctxIds();const rows=gradeRows(id);const t=tick(id,sem);const on=[...document.querySelectorAll('#tbGrades .tbg:checked')].map(x=>rows[+x.value]).filter(Boolean);const ok=new Set(ARE().map(a=>a.id));let n=0;
+ const apply=r=>{for(const k of r.ids){if(!ok.has(k))continue;const d=t.areas[k]??={lvl:0,st:[],nx:[],ex:'',hm:[]};d.lvl=r.lvl;n++;openAreas.add(k)}};
+ on.filter(r=>r.area.toLowerCase().includes('maths')).forEach(apply);on.filter(r=>!r.area.toLowerCase().includes('maths')).forEach(apply);
+ save();paint();const m=el('tbGradeMsg');if(m)m.textContent=n?`Set ${n} subject level${n>1?'s':''} in the builder.`:'Nothing to apply.'};
+stPages['Comment builder']=()=>{let h=_cb();const c=rpCtx();if(!c.id||h.indexOf('<div class="rp-grid">')<0)return h;h=h.replace('<div class="rp-grid">',html()+'<div class="rp-grid">');const j=h.indexOf('My phrase bank');if(j>0){const k=h.lastIndexOf('<section class="card',j);if(k>0)h=h.slice(0,k)+gradeCard(c.id)+h.slice(k)}return h};
 const css=document.createElement('style');css.textContent=`
 .tb{margin:0 0 18px}.tb h3{margin:18px 0 8px;font-size:15px}.tb h4{margin:14px 0 6px;font-size:13px;color:var(--muted)}
 .tb-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:20px;align-items:start}
